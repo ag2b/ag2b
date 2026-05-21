@@ -1,6 +1,6 @@
-import eslint from '@notmedia/eslint-config';
 import { defineConfig, globalIgnores } from 'eslint/config';
 import nextVitals from 'eslint-config-next/core-web-vitals';
+import eslint from 'notmedia-eslint-config';
 
 const eslintConfig = defineConfig([
   eslint.configs.react,

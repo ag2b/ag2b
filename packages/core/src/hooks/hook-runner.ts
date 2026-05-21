@@ -34,10 +34,10 @@ export class HookRunner {
       this.#hooks.set(event, hooks);
     }
 
-    hooks.push(hook as AnyHook);
+    hooks.push(hook);
 
     return () => {
-      const i = hooks.indexOf(hook as AnyHook);
+      const i = hooks.indexOf(hook);
       if (i >= 0) hooks.splice(i, 1);
     };
   }

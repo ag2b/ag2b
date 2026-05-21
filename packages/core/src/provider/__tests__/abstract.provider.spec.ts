@@ -57,7 +57,7 @@ describe('AbstractProvider', () => {
 
       const provider = new TestProvider({
         baseURL: '/api/chat',
-        fetch: customFetch as unknown as typeof fetch,
+        fetch: customFetch,
       });
 
       expect(provider.getFetch()).toBe(customFetch);

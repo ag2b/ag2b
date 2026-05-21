@@ -1,7 +1,7 @@
 import z from 'zod/v4';
 
 import { Ag2bMaxIterationsError } from '@/errors';
-import type { ProviderResponse, ProviderStreamChunk } from '@/provider';
+import type { ProviderResponse } from '@/provider';
 import { AbstractProvider } from '@/provider';
 import { Tool } from '@/tool';
 
@@ -240,7 +240,7 @@ describe('Agent::chatStream', () => {
           id: 'c1',
           name: 'sum',
           argumentsDelta: '{"a":1,"b":1}',
-        } as ProviderStreamChunk,
+        },
         { type: 'provider_stream_done', finishReason: 'tool_calls' as const },
       ])
     );
