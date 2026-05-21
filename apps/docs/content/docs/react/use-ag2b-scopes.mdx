@@ -1,0 +1,66 @@
+---
+title: useAg2bScopes
+---
+
+Reactive view of the agent's registered [Scopes](/docs/primitives/scope). Re-renders on `register` / `unregister` and returns a stable [`Scope[]`](/docs/runtime/scope-registry) reference between mutations.
+
+```ts
+function useAg2bScopes(): Scope[]
+```
+
+<Callout type="info" title="SSR-safe">
+Backed by `useSyncExternalStore` with a server snapshot, so Next.js / Remix render the agent's current scope set server-side without a hydration mismatch.
+</Callout>
+
+<Callout type="warn" title="This hook only re-renders when a scope is registered or unregistered">
+It does not re-render when a scope's `enabled` predicate flips — `scope.isEnabled()` returns the current value at render time, but a change in the predicate's underlying state won't trigger a re-render here. Lift shared enabled-state into React state if you need cross-component reactivity.
+</Callout>
+
+## Usage
+
+### Basic listing
+
+Render each scope by its label.
+
+```tsx
+function ScopeBadges() {
+  const scopes = useAg2bScopes();
+  return (
+    <div>
+      {scopes.map((s) => (
+        <span key={s.name}>{s.label}</span>
+      ))}
+    </div>
+  );
+}
+```
+
+`label` falls back to `name` when not set.
+
+### State
+
+Each [`Scope`](/docs/primitives/scope) exposes `name`, `label`, `tools`, and `isEnabled()`. Use them for status indicators or dev panels:
+
+```tsx
+function ScopeInspector() {
+  const scopes = useAg2bScopes();
+  return (
+    <ul>
+      {scopes.map((s) => (
+        <li key={s.name}>
+          {s.label} — {s.isEnabled() ? 'on' : 'off'} ({s.tools.length} tools)
+        </li>
+      ))}
+    </ul>
+  );
+}
+```
+
+### Mutating scopes
+
+The hook is read-only. To add or remove scopes:
+
+- [`useAg2bScope`](/docs/react/use-ag2b-scope) — register a scope across a component's lifetime (handles cleanup).
+- [`useAg2bAgent`](/docs/react/use-ag2b-agent) → `agent.scopes.register(scope)` — for imperative or one-shot registration outside the React lifecycle.
+
+See [Scope Registry](/docs/runtime/scope-registry) for the underlying API.

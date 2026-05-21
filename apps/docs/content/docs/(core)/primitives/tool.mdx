@@ -1,0 +1,184 @@
+---
+title: Tool
+---
+
+A **Tool** is what the agent calls during a loop iteration. It can do anything a function can — mutate state, trigger side effects, call code you've already written. The return value, if any, feeds back into the LLM on the next turn.
+
+## Usage
+
+```ts
+import { Tool } from '@ag2b/core';
+import { z } from 'zod/v4';
+
+const createNote = new Tool({
+  name: 'createNote',
+  description: 'Create a new note.',
+  parameters: z.object({
+    title: z.string(),
+    body: z.string(),
+  }),
+  handler: ({ title, body }) => useNotes.getState().create({ title, body }),
+});
+```
+
+Expose the tool to the agent by registering it with a [Scope](/docs/primitives/scope).
+
+<Callout type="idea">
+Multiple tool calls in one turn execute **sequentially** — in the order the LLM requested, never in parallel.
+</Callout>
+
+### Async Handlers
+
+Handlers can be async. The agent awaits the result before continuing the loop.
+
+```ts
+handler: ({ a, b }) => Promise.resolve(a + b)
+
+handler: async ({ a, b }) => await sum(a, b)
+```
+
+### Conditional Availability
+
+Add an `enabled` predicate to gate the tool. It's evaluated at **two points**:
+
+- **When the agent builds a request** — a `false` result filters the tool out, so the LLM doesn't see it on that turn.
+- **When the tool is invoked** — if the LLM calls a tool that's now disabled (e.g., from a stale earlier turn). See [`Ag2bDisabledToolError`](#ag2bdisabledtoolerror).
+
+```ts
+import { Tool } from '@ag2b/core';
+import { z } from 'zod/v4';
+
+const createNote = new Tool({
+  name: 'createNote',
+  description: 'Create a new note.',
+  parameters: z.object({
+    title: z.string(),
+    body: z.string(),
+  }),
+  enabled: () => useAuth.getState().isSignedIn,// [!code highlight]
+  handler: ({ title, body }) => useNotes.getState().create({ title, body }),
+});
+```
+
+Throws inside `enabled` are coerced to `false` — a broken predicate hides the tool, never crashes the loop.
+
+## Configuration
+
+```ts
+type ToolConfig<Parameters extends z.ZodObject, Return> = {
+  name: string;
+  description: string;
+  parameters: Parameters;
+  handler: (params: z.infer<Parameters>) => ToolHandlerReturn<Return>;
+  enabled?: () => boolean;
+};
+
+type ToolHandlerReturn<R> = R | Promise<R>;
+```
+
+### `name`
+
+```ts
+name: string
+```
+
+Unique identifier for the tool. The LLM uses this name to invoke it.
+
+<Callout title="The rules:" type="warn">
+* Must match `/^[a-zA-Z0-9_-]+$/`
+* Must be unique across **every** registered [Scope](/docs/primitives/scope)
+
+If either rule is broken, the agent throws `Ag2bError` at setup — not recoverable by LLM, propagates to the caller.
+</Callout>
+
+
+### `description`
+
+```ts
+description: string
+```
+
+What the tool does. Sent to the LLM verbatim; the model uses it to decide when to call.
+
+Treat this as the LLM's only documentation for the tool.
+
+### `parameters`
+
+```ts
+parameters: z.ZodObject
+```
+
+Zod object schema for the tool's arguments. Converted to JSON Schema and sent to the LLM.
+
+<section id="zod-requirements">
+  <Callout type="warn" title="Always import from zod/v4">
+    The `zod/v4` works on both `zod@^3.25.0` (where v4 ships as a subpath) and `zod@^4.0.0` (where it's equivalent to `zod`).
+    Mirror this in your code so it stays portable across the range.
+  </Callout>
+</section>
+
+The top level must be an object — LLMs call tools with named arguments. Use Zod's full toolkit (`.describe()`, `.min()`, `.max()`, etc.) to constrain and document each field. The JSON Schema sent to the LLM reflects all of it.
+
+```ts
+parameters: z.object({
+  email: z.string().email().describe('User email'),
+  quantity: z.number().int().positive().max(99),
+}),
+```
+
+When the LLM invokes the tool, the runtime parses the arguments through this schema **before** calling your handler. On a successful parse, your handler runs with typed, validated args. On failure, [`Ag2bToolValidationError`](#ag2btoolvalidationerror) fires.
+
+### `handler`
+
+```ts
+handler: (args) => ToolHandlerReturn<R>
+```
+
+The function the agent calls when the LLM invokes the tool. Sync or async, both are awaited.
+
+The return value is JSON-serialized into a tool message and feeds back to the LLM on the next turn.
+
+### `enabled`
+
+```ts
+enabled: (() => boolean) | undefined
+```
+
+Predicate that gates the tool. When omitted, the Scope's own `enabled` still gates the group. See [Conditional Availability](#conditional-availability).
+
+## History
+
+Each tool call leaves two records in [history](/docs/runtime/history):
+
+- **Request** — an [`AssistantToolCall`](/docs/runtime/history#assistanttoolcall) on the assistant message's `calls` array. The LLM emits it when it decides to invoke the tool.
+- **Result** — a [`ToolMessage`](/docs/runtime/history#toolmessage) appended after the handler returns. Its `id` matches the originating call. Errors are serialized into this same message, so the LLM can react to them on the next turn.
+
+## Hooks
+
+The agent fires these around tool execution — each one is an interceptor over the value passing through. See [Hooks](/docs/runtime/hooks) for full signatures and examples:
+
+- [`preToolCall`](/docs/runtime/hooks#pretoolcall) — before the handler runs.
+- [`onToolCallResult`](/docs/runtime/hooks#ontoolcallresult) — after a successful return, before the result lands in history.
+- [`onToolCallError`](/docs/runtime/hooks#ontoolcallerror) — after any tool error, before it lands in history.
+
+## Runtime Errors
+
+<Callout type="idea">
+Tool runtime errors don't abort the chat. The agent writes them as [`ToolMessages`](/docs/runtime/history#toolmessage) and lets the LLM recover.
+</Callout>
+
+### Handler Throws
+
+Any error raised inside a `handler` is caught by the agent and serialized as a tool message.
+
+### `Ag2bToolValidationError`
+
+Thrown at invocation when LLM-provided arguments fail the Zod schema. Carries `.tool` (the tool name) and `.issues` (the Zod issue list).
+
+### `Ag2bDisabledToolError`
+
+Thrown at invocation when the LLM calls a tool whose `enabled` returned `false` — typically a stale call from an earlier turn.
+
+### `Ag2bUnknownToolError`
+
+Thrown at invocation when the LLM calls a name that no registered scope provides.

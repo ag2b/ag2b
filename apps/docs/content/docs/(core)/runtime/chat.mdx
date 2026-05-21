@@ -1,0 +1,294 @@
+---
+title: Chat
+---
+import { Chip } from '@heroui/react';
+
+The agent surfaces two ways to drive [the loop](/docs/runtime/the-loop):
+
+- **Synchronous** — `chat()` awaits the final response.
+- **Stream** — `chatStream()` yields events as they happen.
+
+Both run the same loop, same hooks, same history — only the surface differs.
+
+## Agent Response
+
+The agent's final response — [Synchronous](#synchronous) returns it, [Stream](#stream) yields it.
+
+```ts
+type AgentResponse = {
+  content?: string;
+  reasoning?: string;
+  finishReason?: FinishReason;
+};
+```
+
+- **`content`** — final assistant text.
+- **`reasoning`** — reasoning / thinking trace from the final turn, if the provider emitted one.
+- **`finishReason`** — `'stop' | 'tool_calls' | 'length'`.
+
+## Synchronous
+
+```ts
+chat(message: string, options?: ChatOptions): Promise<AgentResponse>
+```
+
+Drives the loop and resolves with the [agent response](#agent-response).
+
+```ts
+const response = await agent.chat('What is blocked right now?');
+console.log(response.content);
+```
+
+### `ChatOptions`
+
+```ts
+type ChatOptions = {
+  signal?: AbortSignal;
+  onEvent?: (event: AgentEvent) => void;
+};
+```
+
+- **`signal`** — abort the run mid-flight. See [Abort](#abort).
+- **`onEvent`** — observe every [event](#events) the loop emits.
+
+```ts
+await agent.chat('What changed?', {
+  onEvent: (event) => {
+    if (event.type === 'agent_tool_call_start') {
+      console.log('calling', event.call.name);
+    }
+  },
+});
+```
+
+## Stream
+
+```ts
+chatStream(message: string, signal?: AbortSignal): AsyncGenerator<AgentEvent>
+```
+
+Drives the loop and yields [events](#events) as they happen.
+
+<Callout type="info">
+Token-by-token streaming requires a [`StreamableProvider`](/docs/providers#streamableprovider). With a sync-only provider, `chatStream` still emits the same events — `*_delta` arrives as a single chunk with the whole content instead of streaming token-by-token.
+</Callout>
+
+```ts
+const output = document.querySelector('#output')!;
+
+for await (const event of agent.chatStream('What is blocked right now?')) {
+  if (event.type === 'agent_content_delta') {
+    output.textContent += event.delta;
+  }
+  if (event.type === 'agent_chat_done') {
+    console.log('finish:', event.response.finishReason);
+  }
+}
+```
+
+## Events
+
+```ts
+type AgentEvent =
+  | AgentChatStart
+  | AgentReasoningDelta
+  | AgentReasoningEnd
+  | AgentContentDelta
+  | AgentContentEnd
+  | AgentToolCallStart
+  | AgentToolCallResult
+  | AgentToolCallError
+  | AgentChatDone
+  | AgentChatAbort
+  | AgentChatError;
+```
+
+Both modes emit every event — only the granularity of content and reasoning deltas differs.
+
+Most events fire **per loop iteration**, not per chat call. A run with N iterations produces N rounds of reasoning / content / tool events.
+
+<Callout type="success" title="Wire your Chat UI to events once">
+You don't need to touch the render layer when switching between synchronous/stream modes.
+</Callout>
+
+### `agent_chat_start`
+
+```ts
+type AgentChatStart = {
+  type: 'agent_chat_start';
+  message: string;
+};
+```
+
+Loop has begun. Carries the user message that triggered it.
+
+### `agent_reasoning_delta`
+
+```ts
+type AgentReasoningDelta = {
+  type: 'agent_reasoning_delta';
+  delta: string;
+};
+```
+
+Chunk of reasoning / thinking text from the LLM.
+
+### `agent_reasoning_end`
+
+```ts
+type AgentReasoningEnd = {
+  type: 'agent_reasoning_end';
+};
+```
+
+Reasoning stream is final for the current loop iteration. Fires once per iteration that produced any reasoning, just before the first non-reasoning event.
+
+### `agent_content_delta`
+
+```ts
+type AgentContentDelta = {
+  type: 'agent_content_delta';
+  delta: string;
+};
+```
+
+Chunk of assistant text.
+
+
+### `agent_content_end`
+
+```ts
+type AgentContentEnd = {
+  type: 'agent_content_end';
+};
+```
+
+An assistant message has been committed to history. Fires once per loop iteration — multiple times in a single chat call when the LLM uses tools across multiple turns. Includes tool-call-only turns that produced no text.
+
+
+### `agent_tool_call_start`
+
+```ts
+type AgentToolCallStart = {
+  type: 'agent_tool_call_start';
+  call: AssistantToolCall;
+};
+```
+
+A tool call is about to execute.
+
+### `agent_tool_call_result`
+
+```ts
+type AgentToolCallResult = {
+  type: 'agent_tool_call_result';
+  call: AssistantToolCall;
+  result: unknown;
+};
+```
+
+Tool call returned successfully.
+
+### `agent_tool_call_error`
+
+```ts
+type AgentToolCallError = {
+  type: 'agent_tool_call_error';
+  call: AssistantToolCall;
+  error: unknown;
+};
+```
+
+Tool call threw (handler throw, validation error, unknown tool, disabled tool).
+
+### `agent_chat_done`
+
+```ts
+type AgentChatDone = {
+  type: 'agent_chat_done';
+  response: AgentResponse;
+};
+```
+
+Loop completed successfully. Terminal event — carries the same `AgentResponse` that `chat()` would return.
+
+### `agent_chat_abort`
+
+```ts
+type AgentChatAbort = {
+  type: 'agent_chat_abort';
+  reason?: unknown;
+};
+```
+
+Chat was cancelled via the abort signal. Terminal event — carries `signal.reason` (a `DOMException("AbortError")` by default, or whatever you passed to `controller.abort(reason)`).
+
+### `agent_chat_error`
+
+```ts
+type AgentChatError = {
+  type: 'agent_chat_error';
+  error: unknown;
+};
+```
+
+Chat ended with a non-abort error (provider throw, max iterations, hook throw). Terminal event — carries the same error that re-throws to the caller.
+
+### Mode Differences
+
+How each event emits, side by side:
+
+| Event | Synchronous | Stream |
+|---|---|---|
+| `agent_chat_start` | once | once |
+| `agent_reasoning_delta` | <Chip color="default" variant='soft' size="md">1 delta (whole reasoning) per iteration</Chip> | <Chip color="default" variant='soft' size="md">N deltas (token-by-token) per iteration</Chip> |
+| `agent_reasoning_end` | once per iteration | once per iteration |
+| `agent_content_delta` | <Chip color="default" variant='soft' size="md">1 delta (whole content) per iteration</Chip> | <Chip color="default" variant='soft' size="md">N deltas (token-by-token) per iteration</Chip> |
+| `agent_content_end` | once per iteration | once per iteration |
+| `agent_tool_call_start` | per tool call | per tool call |
+| `agent_tool_call_result` | per tool call (on success)| per tool call (on success)|
+| `agent_tool_call_error` | per tool call (on error)| per tool call (on error)|
+| `agent_chat_done` | once (on success) | once (on success) |
+| `agent_chat_abort` | once (on abort) | once (on abort) |
+| `agent_chat_error` | once (on error) | once (on error) |
+
+## Abort
+
+Pass an `AbortSignal` to cancel a run mid-flight. The agent checks between iterations and threads the signal through the provider call and tool handler awaits.
+
+On abort, the loop:
+
+1. Emits `agent_chat_abort` event — carries `signal.reason`.
+2. Runs the `onChatAbort` hook.
+3. Re-throws `signal.reason` to the caller.
+
+Prefer the event for UI / state — it fires *before* the throw and tells abort apart from real errors cleanly:
+
+```ts
+const controller = new AbortController();
+setTimeout(() => controller.abort(), 5_000);
+
+for await (const event of agent.chatStream('Long task', controller.signal)) {
+  if (event.type === 'agent_chat_abort') {
+    console.log('cancelled:', event.reason);
+  }
+}
+```
+
+`try` / `catch` still works, but the thrown value is whatever you passed to `controller.abort(reason)` — not always an `AbortError`. Check `signal.aborted` to disambiguate:
+
+```ts
+const controller = new AbortController();
+setTimeout(() => controller.abort(new Error('timeout')), 5_000);
+
+try {
+  await agent.chat('Long task', { signal: controller.signal });
+} catch (err) {
+  if (controller.signal.aborted) {
+    // err is signal.reason — the value you passed to controller.abort()
+    console.log('cancelled:', err);
+  } else {
+    throw err;
+  }
+}
+```

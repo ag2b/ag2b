@@ -1,0 +1,80 @@
+---
+title: useAg2bHistory
+---
+
+Reactive view of the conversation. Re-renders on every history mutation and returns a stable [`ChatMessage[]`](/docs/runtime/history#messages) reference between mutations.
+
+```ts
+function useAg2bHistory(): ChatMessage[]
+```
+
+<Callout type="info" title="SSR-safe">
+Backed by `useSyncExternalStore` with a server snapshot, so Next.js / Remix render the agent's current history server-side without a hydration mismatch.
+</Callout>
+
+## Usage
+
+### Basic transcript
+
+Render every message in the order it entered the loop.
+
+```tsx
+function Transcript() {
+  const messages = useAg2bHistory();
+  return (
+    <ul>
+      {messages.map((m, i) => (
+        <li key={i}>
+          <strong>{m.role}</strong>: {m.content ?? '(no content)'}
+        </li>
+      ))}
+    </ul>
+  );
+}
+```
+
+Why the `?? '(no content)'`: assistant turns that only call tools have no `content`. See [`AssistantMessage`](/docs/runtime/history#assistantmessage).
+
+### Handling roles
+
+Each entry is a [`UserMessage`](/docs/runtime/history#usermessage), [`AssistantMessage`](/docs/runtime/history#assistantmessage), or [`ToolMessage`](/docs/runtime/history#toolmessage). Discriminate on `role` to render each shape differently — styled bubbles, expandable tool results, reasoning traces:
+
+```tsx
+function Transcript() {
+  const messages = useAg2bHistory();
+  return messages.map((m, i) => {
+    switch (m.role) {
+      case 'user':
+        return <UserBubble key={i} text={m.content} />;
+      case 'assistant':
+        return (
+          <AssistantBubble
+            key={i}
+            text={m.content}
+            reasoning={m.reasoning}
+            calls={m.calls}
+          />
+        );
+      case 'tool':
+        return <ToolResult key={i} id={m.id} payload={m.content} />;
+    }
+  });
+}
+```
+
+### Pairing with streaming
+
+For streaming chats, splice `pendingMessage` from [`useAg2bChatStream`](/docs/react/use-ag2b-chat-stream#chat-history) onto `messages` to render the in-flight assistant turn alongside committed history.
+
+### Mutating history
+
+The hook is read-only. To clear or replace the conversation, call methods on `agent.history` directly via [`useAg2bAgent`](/docs/react/use-ag2b-agent):
+
+```tsx
+function NewChatButton() {
+  const agent = useAg2bAgent();
+  return <button onClick={() => agent.history.reset()}>New chat</button>;
+}
+```
+
+See [History](/docs/runtime/history) for `reset`, `restore`, and the message-type schemas.

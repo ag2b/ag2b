@@ -1,0 +1,44 @@
+---
+title: Ag2bProvider
+---
+
+Provides the [`Agent`](/docs/runtime) used by `@ag2b/react` hooks.
+
+```ts
+type Ag2bProviderProps = {
+  agent: Agent;
+};
+```
+
+## Usage
+
+```tsx
+import { Agent, OpenAiProvider } from '@ag2b/core';
+import { Ag2bProvider } from '@ag2b/react';
+
+const agent = new Agent({
+  provider: new OpenAiProvider({ baseURL: '/api/llm' }),
+});
+
+export function App() {
+  return (
+    <Ag2bProvider agent={agent}>
+      {/* descendants can use the @ag2b/react hooks */}
+    </Ag2bProvider>
+  );
+}
+```
+
+### Multiple Agents
+
+Nest providers when different parts of the tree need different agents.
+
+```tsx
+<Ag2bProvider agent={mainAgent}>
+  <Sidebar />
+  <Ag2bProvider agent={experimentalAgent}>
+    {/* The closest provider wins for any descendant. */}
+    <ExperimentalPanel />
+  </Ag2bProvider>
+</Ag2bProvider>
+```

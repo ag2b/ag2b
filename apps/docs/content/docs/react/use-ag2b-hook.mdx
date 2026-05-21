@@ -1,0 +1,79 @@
+---
+title: useAg2bHook
+---
+
+Register an agent [lifecycle hook](/docs/runtime/hooks) for the component's lifetime. The hook unregisters on unmount.
+
+```ts
+function useAg2bHook<K extends keyof AgentHooks>(
+  event: K,
+  hook: AgentHooks[K]
+): void
+```
+
+<Callout type="warn" title="Reactivity rules">
+**Always-fresh** — the `hook` handler. Re-read on every event, so inline arrows can close over reactive state without re-registering.
+</Callout>
+
+## Usage
+
+### Observing
+
+Observers return `void` — useful for logging, metrics, and UI side effects:
+
+```tsx
+function ChatLogger() {
+  const audit = useAudit();
+
+  useAg2bHook('onChatStart', (ctx) => {
+    audit.log(`User: ${ctx.message}`);
+  });
+
+  useAg2bHook('onChatDone', (ctx) => {
+    audit.log(`Bot: ${ctx.response.content ?? ''}`);
+  });
+
+  return null;
+}
+```
+
+### Intercepting
+
+Interceptors return a modified value to rewrite the in-flight request, response, or tool args:
+
+```tsx
+function ConcisePrompt() {
+  useAg2bHook('preRequest', (ctx) => ({
+    request: {
+      ...ctx.request,
+      system: (ctx.request.system ?? '') + '\nBe concise.',
+    },
+  }));
+
+  return null;
+}
+```
+
+Returning nothing keeps the original value — no need to early-return when an interceptor doesn't apply.
+
+### Short-circuiting
+
+[`preRequest`](/docs/runtime/hooks#prerequest) and [`preToolCall`](/docs/runtime/hooks#pretoolcall) can skip the downstream step by returning a synthetic result or error:
+
+```tsx
+function PermissionGate() {
+  const user = useUser();
+
+  useAg2bHook('preToolCall', (ctx) => {
+    if (!user.canRun(ctx.tool.name)) {
+      return { error: new Error('Not permitted') };
+    }
+  });
+
+  return null;
+}
+```
+
+`user` is closed over from React state — when permissions change, the next tool call sees the new value because the handler is auto-pinned.
+
+See [Hooks](/docs/runtime/hooks) for the full event list, short-circuit shapes per interceptor, and per-event context types.

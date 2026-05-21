@@ -1,0 +1,106 @@
+---
+title: Quickstart
+description: Getting started with AG2B and React
+icon: Rocket
+index: true
+---
+
+## Requirements
+
+- `@ag2b/core`
+- `react` `>= 18`
+- `zod` `^3.25.0 || ^4.0.0`
+
+<include>../(core)/primitives/tool.mdx#zod-requirements</include>
+
+## Getting started
+
+### Installation
+
+```npm
+npm i @ag2b/react @ag2b/core zod
+```
+
+### Writing your first agent
+
+#### Create the agent [step]
+
+Construct an [Agent](/docs/runtime) with a [Provider](/docs/providers).
+
+```ts title="agent.ts"
+import { Agent, OpenAiProvider } from '@ag2b/core';
+
+export const agent = new Agent({
+  provider: new OpenAiProvider({ baseURL: '/api/llm' }),
+});
+```
+
+#### Connect a Tool [step]
+
+Build a [Tool](/docs/primitives/tool) and pair with [Scope](/docs/primitives/scope) to expose it to the agent.
+
+```tsx title="appearance.tsx"
+import { useAg2bScope, useAg2bTool } from '@ag2b/react';
+import { z } from 'zod/v4';
+
+export function Appearance() {
+  const setBackground = useAg2bTool({
+    name: 'setBackground',
+    description: 'Change the page background color.',
+    parameters: z.object({
+      color: z.string().describe('Any valid CSS color (name, hex, rgb, etc.)'),
+    }),
+    handler: ({ color }) => {
+      document.body.style.backgroundColor = color;
+    },
+  });
+
+  useAg2bScope({ name: 'appearance', tools: [setBackground] });
+
+  return null;
+}
+```
+
+#### Add a chat UI [step]
+
+Create a control that sends prompts and shows the reply.
+
+```tsx title="chat.tsx"
+import { useAg2bChat } from '@ag2b/react';
+
+export function Chat() {
+  const { send, response, isPending } = useAg2bChat();
+
+  return (
+    <button
+      disabled={isPending}
+      onClick={() => send('Make the page feel like a sunset, use oklch.')}
+    >
+      {response?.content ?? (isPending ? 'thinking…' : 'Vibes please')}
+    </button>
+  );
+}
+```
+
+#### Wire it together [step]
+
+Wrap yor components in `<Ag2bProvider>` so every hook reaches the agent.
+
+```tsx title="App.tsx"
+import { Ag2bProvider } from '@ag2b/react';
+
+import { agent } from './agent';
+import { Appearance } from './appearance';
+import { Chat } from './chat';
+
+export function App() {
+  return (
+    <Ag2bProvider agent={agent}>
+      <Appearance />
+      <Chat />
+    </Ag2bProvider>
+  );
+}
+```
+
+The LLM interprets the prompt, picks a color, calls `setBackground` — the page background changes.

@@ -1,0 +1,76 @@
+---
+title: OpenAI
+---
+import { Chip } from '@heroui/react';
+
+<Chip color="default" variant='soft' size="md">Synchronous</Chip>
+<Chip color="default" variant='soft' size="md">Stream</Chip>
+<Chip color="default" variant='soft' size="md">Reasoning</Chip>
+
+`OpenAiProvider` connects the agent to any OpenAI-compatible `/v1/chat/completions` API and maps to AG2B's [normalized messages](/docs/runtime/history#messages).
+
+## Usage
+
+```ts
+import { Agent, OpenAiProvider } from '@ag2b/core';
+
+const agent = new Agent({
+  provider: new OpenAiProvider({
+    baseURL: '/api/llm',
+    model: 'gpt-4o',
+  }),
+});
+```
+
+### Reasoning
+
+Pass `reasoningField` to choose which property the provider reads reasoning text from. OpenAI-compatible providers don't agree on the name — DeepSeek-R1 / DeepSeek-V3 use `reasoning_content` (the default), OpenRouter uses `reasoning`.
+
+```ts
+new OpenAiProvider({
+  baseURL: '/api/llm',
+  model: 'openrouter/deepseek-r1',
+  reasoningField: 'reasoning',
+});
+```
+
+<Callout type="info">
+The provider reads the configured field off `choice.message` (sync) and `choice.delta` (stream). If your backend emits reasoning under a different name, set `reasoningField` accordingly — otherwise reasoning text silently drops.
+</Callout>
+
+## Configuration
+
+### `baseURL`
+
+```ts
+baseURL: string
+```
+
+URL the provider POSTs to.
+
+### `fetch`
+
+```ts
+fetch: typeof fetch | undefined
+```
+
+<include>index.mdx#provider-security</include>
+
+Custom fetch implementation. Defaults to `globalThis.fetch`. See [Custom Fetch](/docs/providers#custom-fetch) for a wrapper example.
+
+### `model`
+
+```ts
+model: string | undefined
+```
+
+Model name sent in the request body's `model` field (e.g. `'gpt-4o'`). When omitted, no `model` field is sent.\
+A proxy endpoint may inject it. Direct calls to most OpenAI-compatible APIs will be rejected.
+
+### `reasoningField`
+
+```ts
+reasoningField: string | undefined
+```
+
+Property name on `choice.message` and `choice.delta` to read as reasoning text. Defaults to `'reasoning_content'`. See [Reasoning](#reasoning).

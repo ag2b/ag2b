@@ -1,0 +1,227 @@
+---
+title: useAg2bChatStream
+---
+
+Stateful hook for [streaming](/docs/runtime/chat#stream) chat.
+
+```ts
+function useAg2bChatStream(): {
+  send: (message: string) => Promise<AgentResponse | undefined>;
+  response: AgentResponse | undefined;
+  pendingMessage: AssistantMessage | null;
+  events: AgentEvent[];
+  isPending: boolean;
+  error: unknown;
+  abort: () => void;
+};
+```
+
+<Callout type="info">
+Token-by-token deltas require a [`StreamableProvider`](/docs/providers#streamableprovider). With a sync-only provider, `chatStream` still works — deltas arrive in a single chunk per iteration instead of per token.
+</Callout>
+
+## Usage
+
+### Basic chat
+
+Render `pendingMessage?.content` while a send is in flight. Fall back to `response?.content` once it commits.
+
+```tsx
+function StreamingChat() {
+  const { send, pendingMessage, response, isPending } = useAg2bChatStream();
+  const [input, setInput] = useState('');
+
+  return (
+    <>
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          send(input);
+          setInput('');
+        }}
+      >
+        <input value={input} onChange={(e) => setInput(e.target.value)} />
+        <button disabled={isPending}>{isPending ? 'streaming…' : 'send'}</button>
+      </form>
+      <div>{pendingMessage?.content ?? response?.content}</div>
+    </>
+  );
+}
+```
+
+### Agent Events
+
+Use `events` to render progress while a stream is in flight — tool calls, iteration boundaries, finish reasons:
+
+```tsx
+function ChatWithIndicators() {
+  const { send, events, response } = useAg2bChatStream();
+  const toolCalls = events.filter((e) => e.type === 'agent_tool_call_start').length;
+
+  return (
+    <>
+      <button onClick={() => send('What is blocked?')}>send</button>
+      {toolCalls > 0 && <div>Called {toolCalls} tool(s) so far…</div>}
+      {response && <div>{response.content}</div>}
+    </>
+  );
+}
+```
+
+### Live assistant turn
+
+`pendingMessage` is the in-flight assistant turn — populated while content or reasoning deltas are arriving, `null` otherwise. The hook clears it the moment the iteration commits to history, so combining `pendingMessage` with [`useAg2bHistory`](/docs/react/use-ag2b-history) never duplicates the committed turn.
+
+A two-iteration send where the LLM reasons, answers, calls a tool, then answers again:
+
+```diff
+// iteration 1
++ agent_reasoning_delta "Let me "       pendingMessage = { reasoning: "Let me " }
++ agent_reasoning_delta "check..."      pendingMessage = { reasoning: "Let me check..." }
++ agent_content_delta   "I'll fetch "   pendingMessage = { content: "I'll fetch ", reasoning: "Let me check..." }
++ agent_content_delta   "the data."     pendingMessage = { content: "I'll fetch the data.", reasoning: "Let me check..." }
+- agent_content_end                     pendingMessage = null   (iteration committed to history)
+
+// tool runs — pendingMessage stays null
+
+// iteration 2
++ agent_content_delta   "Got it: "      pendingMessage = { content: "Got it: " }
++ agent_content_delta   "X is 42."      pendingMessage = { content: "Got it: X is 42." }
+- agent_chat_done                       pendingMessage = null, response.content = "Got it: X is 42."
+```
+
+Within an iteration, `pendingMessage.content` and `pendingMessage.reasoning` accumulate as deltas arrive. After [`agent_content_end`](/docs/runtime/chat#agent_content_end), the assistant turn is in history and `pendingMessage` is `null` until the next iteration's first delta. After [`agent_chat_done`](/docs/runtime/chat#agent_chat_done), the final values are also on `response`.
+
+### Chat History
+
+[`useAg2bHistory`](/docs/react/use-ag2b-history) gives you the live conversation. Splice `pendingMessage` onto the end to show the in-flight assistant turn alongside it:
+
+```tsx
+function Chat() {
+  const messages = useAg2bHistory(); // [!code highlight]
+  const { send, pendingMessage, isPending } = useAg2bChatStream();
+  const [input, setInput] = useState('');
+
+  const all = [...messages, pendingMessage].filter(Boolean);
+
+  return (
+    <>
+      {all.map((m, i) => (
+        <div key={i}>{m.role}: {m.content ?? '(no content)'}</div> // [!code highlight]
+      ))}
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          send(input);
+          setInput('');
+        }}
+      >
+        <input value={input} onChange={(e) => setInput(e.target.value)} />
+        <button disabled={isPending}>{isPending ? 'streaming…' : 'send'}</button>
+      </form>
+    </>
+  );
+}
+```
+
+### Errors
+
+`send()` never throws — it resolves to `undefined` and stores the failure in `error` which can hold:
+
+- [`Ag2bMaxIterationsError`](/docs/runtime#ag2bmaxiterationserror) — the loop hit `maxIterations`.
+- Provider errors — [`Ag2bProviderRequestError`](/docs/providers#ag2bproviderrequesterror), [`Ag2bProviderResponseError`](/docs/providers#ag2bproviderresponseerror).
+- A network failure from `fetch` (DNS, connection refused, etc.).
+- Anything thrown from a registered agent [hook](/docs/runtime/hooks).
+
+<Callout type="warn" title="Two exceptions:">
+- Tool handler throws don't land here — the LLM can recover from them, so they're emitted as [`agent_tool_call_error`](/docs/runtime/chat#agent_tool_call_error) events instead.
+
+- `abort()` doesn't land here either — to catch aborts, listen for the [`agent_chat_abort`](/docs/runtime/chat#agent_chat_abort) event.
+</Callout>
+
+```tsx
+function Chat() {
+  const { send, error, isPending } = useAg2bChatStream();
+  return (
+    <>
+      {error && <div role="alert">{String(error)}</div>}
+      <button disabled={isPending} onClick={() => send('hi')}>send</button>
+    </>
+  );
+}
+```
+
+### Aborting
+
+Cancel an in-flight send with `abort()`. The hook also auto-aborts on unmount and when `send()` is called while a prior send is still running:
+
+```tsx
+function ChatWithCancel() {
+  const { send, abort, isPending } = useAg2bChatStream();
+
+  return (
+    <>
+      <button onClick={() => send('Long task')}>send</button>
+      {isPending && <button onClick={abort}>cancel</button>}
+    </>
+  );
+}
+```
+
+## Returns
+
+### `send`
+
+```ts
+send: (message: string) => Promise<AgentResponse | undefined>
+```
+
+Calls [`agent.chatStream()`](/docs/runtime/chat#stream) with the message. Aborts any prior in-flight send and clears `error`. Resolves with [`AgentResponse`](/docs/runtime/chat#agent-response), or `undefined` if the send was aborted, superseded by a newer `send()`, or threw a non-abort error.
+
+### `response`
+
+```ts
+response: AgentResponse | undefined
+```
+
+The last successful [`AgentResponse`](/docs/runtime/chat#agent-response). Persists across the start of a new `send()` — only overwritten when the new send completes.
+
+### `pendingMessage`
+
+```ts
+pendingMessage: AssistantMessage | null
+```
+
+The in-flight assistant turn — populated while content or reasoning deltas are arriving, `null` between iterations, during tool execution, and after [`agent_chat_done`](/docs/runtime/chat#agent_chat_done). Splices cleanly onto [`useAg2bHistory`](/docs/react/use-ag2b-history) with `[...messages, pendingMessage].filter(Boolean)` — no duplication of the committed turn. See [Live assistant turn](#live-assistant-turn).
+
+### `events`
+
+```ts
+events: AgentEvent[]
+```
+
+Array of [`AgentEvent`](/docs/runtime/chat#events) emitted during the current send. Resets on every `send()`.
+
+### `isPending`
+
+```ts
+isPending: boolean
+```
+
+`true` while a send is in flight.
+
+### `error`
+
+```ts
+error: unknown
+```
+
+The last non-abort error from a send. Cleared automatically on the next `send()`. See [Errors](#errors).
+
+### `abort`
+
+```ts
+abort: () => void
+```
+
+Cancel the in-flight send. See [Aborting](#aborting).

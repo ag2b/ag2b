@@ -1,0 +1,10 @@
+{
+  "title": "Vue",
+  "description": "Vue bindings",
+  "icon": "Vue",
+  "root": true,
+  "pages": [
+    "---Introduction---",
+    "index"
+  ]
+}

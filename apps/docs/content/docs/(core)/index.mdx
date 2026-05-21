@@ -1,0 +1,87 @@
+---
+title: Quickstart
+description: Getting started with AG2B
+icon: Rocket
+index: true
+---
+import { SiReact, SiVuedotjs } from '@icons-pack/react-simple-icons';
+import { Brain, Cog, Layers, Repeat } from 'lucide-react';
+
+<include>what-is-ag2b.mdx#ag2b-definition</include>
+
+<Callout type="info" title='Curious why client-side?'>
+Read our deep-dive [What is AG2B](/docs/what-is-ag2b) article.
+</Callout>
+
+## Integrations
+
+AG2B has framework-specific libraries that ship as separate packages:
+
+<Cards>
+  <Card icon={<SiReact className='text-react'/>} title="React" description="AG2B bindings for React" href="docs/react" />
+  <Card icon={<SiVuedotjs className='text-vue'/>} title="Vue" description="Coming soon" />
+</Cards>
+
+## Getting started
+
+### Requirements
+
+- An LLM provider — OpenAI, Anthropic, or your own proxy
+- `zod` `^3.25.0 || ^4.0.0`
+
+<include>primitives/tool.mdx#zod-requirements</include>
+
+### Installation
+
+```npm
+npm i @ag2b/core zod
+```
+
+### Writing your first agent
+
+```ts
+import { Agent, OpenAiProvider, Scope, Tool } from '@ag2b/core';
+import z from 'zod/v4';
+
+// Create an Agent
+const agent = new Agent({ provider: new OpenAiProvider({ baseURL: '/api/llm' }) });
+
+// Create a Tool — runs in the browser
+const setBackground = new Tool({
+  name: 'setBackground',
+  description: 'Change the page background color.',
+  parameters: z.object({
+    color: z.string().describe('Any valid CSS color (name, hex, rgb, etc.)'),
+  }),
+  handler: ({ color }) => {
+    document.body.style.backgroundColor = color;
+  },
+});
+
+// Create a Scope where the tool lives
+const appearance = new Scope({
+  name: 'appearance',
+  tools: [setBackground],
+});
+
+// Register scope on agent
+agent.scopes.register(appearance);
+
+// Chat! // [!code highlight]
+await agent.chat('Make the page feel like a sunset, use oklch.'); // [!code highlight]
+```
+
+The LLM interprets the prompt, picks a color, calls `setBackground` — the handler runs in your browser and the page changes. The result feeds back into the loop and the model replies in plain text describing what it did.
+
+## Learn more
+
+<Cards>
+  <Card icon={<Cog />} title="Tool" href="/docs/primitives/tool"
+        description="A function the LLM can call in the browser." />
+  <Card icon={<Layers />} title="Scope" href="/docs/primitives/scope"
+        description="A unit of tools and context the agent activates together." />
+  <Card icon={<Brain />} title="Agent" href="/docs/runtime"
+        description="Runs the loop. Owns the runtime state." />
+  <Card icon={<Repeat />} title="The Loop" href="/docs/runtime/the-loop"
+        description="How the runtime works, top to bottom." />
+</Cards>

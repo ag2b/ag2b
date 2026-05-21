@@ -1,0 +1,92 @@
+---
+title: Agent
+---
+
+The **Agent** runs the loop. It coordinates the [Provider](/docs/providers), the [Scopes](/docs/primitives/scope) you register, [history](/docs/runtime/history), and [lifecycle hooks](/docs/runtime/hooks).
+
+## Usage
+
+```ts
+import { Agent, OpenAiProvider } from '@ag2b/core';
+
+import { board } from './board';
+
+const agent = new Agent({
+  provider: new OpenAiProvider({ baseURL: '/api/llm', model: 'gpt-4o' }),
+  system: 'You help users manage a kanban board.',
+});
+
+agent.scopes.register(board);
+
+const response = await agent.chat('What is blocked right now?');
+console.log(response.content);
+```
+
+### `createAgent`
+
+```ts
+function createAgent(config: AgentConfig, scopes?: Scope[]): Agent
+```
+
+When your scopes already exist at construction time, the `createAgent` factory wires them in one call:
+
+```ts
+import { createAgent, OpenAiProvider } from '@ag2b/core';
+
+import { board, calendar } from './scopes';
+
+const agent = createAgent(
+  {
+    provider: new OpenAiProvider({ baseURL: '/api/llm', model: 'gpt-4o' }),
+    system: 'You help users manage a kanban board.',
+  },
+  [board, calendar]
+);
+```
+
+## Configuration
+
+### `provider`
+
+```ts
+provider: AbstractProvider
+```
+
+Built-in [`OpenAiProvider`](/docs/providers/openai), [`AnthropicProvider`](/docs/providers/anthropic), or a [custom provider](/docs/providers#custom-provider) you write.
+
+The provider is the only thing in the runtime that talks to the network.
+
+### `system`
+
+```ts
+system: string | undefined
+```
+
+Base system prompt sent with every request. [Scope](/docs/primitives/scope) contexts with `injection: 'system'` are appended after this base on each turn.
+
+### `maxIterations`
+
+```ts
+maxIterations: number | undefined
+```
+
+Maximum number of loop iterations before the agent gives up. Defaults to `20`.
+
+When the loop runs this many iterations without producing a final response, [`Ag2bMaxIterationsError`](#ag2bmaxiterationserror) fires.
+
+## Surface
+
+The Agent's public surface:
+
+- [`chat(message, options?)`](/docs/runtime/chat) — drive the loop, await the final response.
+- [`chatStream(message, signal?)`](/docs/runtime/chat#stream) — same loop, yields events as they happen.
+- [`scopes`](/docs/runtime/scope-registry) — the scope registry.
+- [`history`](/docs/runtime/history) — conversation history.
+- [`addHook(event, fn)`](/docs/runtime/hooks) — observe or intercept any lifecycle event.
+- [`use(plugin)`](/docs/runtime/plugins) — install a plugin — hooks, scopes, or any other agent setup bundled together.
+
+## Runtime Errors
+
+### `Ag2bMaxIterationsError`
+
+Thrown when the iteration counter reaches [`maxIterations`](#maxiterations). Carries `.iterations` — the count reached.

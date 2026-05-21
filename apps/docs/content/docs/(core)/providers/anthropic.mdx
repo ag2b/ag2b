@@ -1,0 +1,87 @@
+---
+title: Anthropic
+---
+import { Chip } from '@heroui/react';
+
+<Chip color="default" variant='soft' size="md">Synchronous</Chip>
+<Chip color="default" variant='soft' size="md">Stream</Chip>
+<Chip color="default" variant='soft' size="md">Reasoning</Chip>
+
+`AnthropicProvider` connects the agent to Anthropic's Messages `/v1/messages` API and maps to AG2B's [normalized messages](/docs/runtime/history#messages).
+
+## Usage
+
+```ts
+import { Agent, AnthropicProvider } from '@ag2b/core';
+
+const agent = new Agent({
+  provider: new AnthropicProvider({
+    baseURL: '/api/llm',
+    model: 'claude-sonnet-4-6',
+    maxTokens: 1024,
+  }),
+});
+```
+
+### Reasoning
+
+Pass `thinking: { enabled: true, budgetTokens: N }` to turn on Claude's extended thinking.
+
+```ts
+new AnthropicProvider({
+  baseURL: '/api/llm',
+  model: 'claude-sonnet-4-6',
+  maxTokens: 4096,
+  thinking: { enabled: true, budgetTokens: 2048 },
+});
+```
+
+<Callout type="info">
+Anthropic requires signed thinking blocks to be echoed back on turns that also produce tool calls — the provider handles this for you via message metadata.
+</Callout>
+
+## Configuration
+
+### `baseURL`
+
+```ts
+baseURL: string
+```
+
+URL the provider POSTs to.
+
+### `fetch`
+
+```ts
+fetch: typeof fetch | undefined
+```
+
+<include>index.mdx#provider-security</include>
+
+Custom fetch implementation. Defaults to `globalThis.fetch`. See [Custom Fetch](/docs/providers#custom-fetch) for a wrapper example.
+
+### `model`
+
+```ts
+model: string | undefined
+```
+
+Model name sent in the request body's `model` field (e.g. `'claude-sonnet-4-6'`). When omitted, no `model` field is sent.\
+A proxy endpoint may inject it. Direct calls to Anthropic's API will be rejected.
+
+### `maxTokens`
+
+```ts
+maxTokens: number | undefined
+```
+
+Sent in the request body's `max_tokens` field. When omitted, no `max_tokens` field is sent.\
+A proxy endpoint may inject it. Direct calls to Anthropic's API will be rejected.
+
+### `thinking`
+
+```ts
+thinking: { enabled: boolean; budgetTokens: number } | undefined
+```
+
+See [Reasoning](#reasoning).

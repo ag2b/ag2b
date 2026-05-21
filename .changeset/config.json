@@ -1,0 +1,18 @@
+{
+  "$schema": "https://unpkg.com/@changesets/config@3.1.4/schema.json",
+  "changelog": [
+    "@changesets/changelog-github",
+    {
+      "repo": "ag2b/ag2b"
+    }
+  ],
+  "commit": false,
+  "fixed": [["@ag2b/core", "@ag2b/react"]],
+  "linked": [],
+  "access": "public",
+  "baseBranch": "main",
+  "updateInternalDependencies": "patch",
+  "ignore": [
+    "docs"
+  ]
+}

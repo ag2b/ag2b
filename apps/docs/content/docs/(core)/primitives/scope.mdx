@@ -1,0 +1,207 @@
+---
+title: Scope
+---
+
+A **Scope** is a named group of [tools](/docs/primitives/tool) and optional context that the agent registers and unregisters as a unit.
+Tools become callable, context becomes a labeled section in the LLM's prompt.
+
+Use it to scope **anything** — a feature, a page, your whole app — whatever you want to switch on and off as a unit.
+
+## Usage
+
+```ts
+import { Scope } from '@ag2b/core';
+
+import { approve, requestChanges, commentOnLine } from './tools';
+import { usePullRequest } from './store';
+
+const pullRequest = new Scope({
+  name: 'pullRequest',
+  label: 'Pull request',
+  tools: [approve, requestChanges, commentOnLine],
+  context: () => {
+    const { title, files, status } = usePullRequest.getState();
+    return { title, files, status };
+  },
+});
+```
+
+### Context Injection
+
+**Context** is state the LLM should know about beyond the chat itself — the current page, what's selected, the user's role, anything that shapes the response. A scope's `context` resolver returns this snapshot, and the agent injects it into the outgoing LLM request.
+
+#### Resolver
+
+`context` is a pure, sync function. Its return value lands in the outgoing LLM request under the scope's `label`.
+
+<Callout type="idea">
+The resolver runs on every iteration — what the UI renders this turn is what the LLM sees this turn.
+</Callout>
+
+```ts
+const viewing = new Scope({
+  name: 'viewing',
+  injection: 'system',
+  context: () => ({ file: useDiff.getState().currentFile }),
+});
+```
+
+Throws inside `context` are caught — a broken resolver drops the section, never crashes the loop.
+
+#### Strategies
+
+```ts
+type ContextInjectionStrategy = 'system' | 'user';
+```
+
+`injection` controls where the resolved context lands in the outgoing LLM request:
+
+- **`system`** *(default)* — appended to the system prompt. Cache-friendly when the data is stable across turns (user identity, role, page).
+- **`user`** — appended to the outgoing user message for this request only. Use for volatile per-turn data (selection, cursor, in-flight values) that would otherwise invalidate a cached system prefix every turn.
+
+<Callout type="success">
+Injection only modifies the **outgoing request**. [History](/docs/runtime/history) keeps the original user prompt and your base system prompt — the resolver's output never persists.
+</Callout>
+
+#### Scope Context
+
+```ts
+type ScopeContext = {
+  label: string;
+  injection: ContextInjectionStrategy;
+  content: unknown;
+};
+```
+
+The runtime collects one of these per enabled scope before each provider call and hands the array to the [Provider](/docs/providers#preparing-request) for serialization.
+
+- **`label`** — section header in the rendered prompt (defaults to the scope's `name` when `label` is omitted).
+- **`injection`** — where this entry lands, see [Strategies](#strategies).
+- **`content`** — the raw resolver return.
+
+#### Provider Format
+
+The exact format depends on the Provider's [`prepareRequest`](/docs/providers#preparing-request).
+The base [`AbstractProvider`](/docs/providers#abstractprovider) renders each scope as a Markdown section,
+and built-in providers inherit that default. A custom provider can override `prepareRequest` to use any encoding.
+
+**Markdown Injection**
+
+Your resolver's return value becomes `{content}` — strings pass through, anything else is `JSON.stringify`'d at the provider boundary:
+
+```ts
+context: () => 'Current page: /dashboard'    // passes through as a string
+context: () => ({ page: '/dashboard' })      // becomes {"page":"/dashboard"}
+```
+
+With `'system'` injection, the `pullRequest` scope appends after your base system prompt:
+
+```diff title="System Message"
+ You help users review pull requests.
++
++## Pull request
++{"title":"Fix auth flow","files":7,"status":"open"}
+```
+
+With `'user'` injection, the scope's content appends to the last user message instead:
+
+```ts
+const focusedLine = new Scope({
+  name: 'focusedLine',
+  label: 'Selected line',
+  injection: 'user',
+  context: () => useDiff.getState().focusedLine,
+});
+```
+
+```diff title="User Message"
+ Suggest a fix.
++
++## Selected line
++{"file":"auth.ts","line":42,"text":"const a = ..."}
+```
+
+### Conditional Availability
+
+Add an `enabled` predicate to gate the entire scope. When it returns `false`:
+
+- **Tools** in the scope are filtered out — the LLM doesn't see them on that turn.
+- **Context** is dropped — its section disappears from the prompt.
+
+```ts
+const merging = new Scope({
+  name: 'merging',
+  enabled: () => useUser.getState().canMerge, // [!code highlight]
+  tools: [mergePR, closePR],
+});
+```
+
+Throws inside `enabled` are coerced to `false`. Scope-level `enabled` is checked alongside each [Tool's](/docs/primitives/tool#enabled) own `enabled` — both must pass.
+
+## Configuration
+
+```ts
+type ScopeConfig = {
+  name: string;
+  label?: string;
+  tools?: Tool[];
+  context?: () => unknown;
+  injection?: ContextInjectionStrategy;
+  enabled?: () => boolean;
+};
+```
+
+### `name`
+
+```ts
+name: string
+```
+
+Unique identifier for the scope.
+
+<Callout type="warn" title="The rules:">
+* Must be unique across **every** registered scope on the agent.
+* Tool name collisions across scopes also throw on register.
+
+If either rule is broken, the agent throws `Ag2bError` at setup — not recoverable by LLM, propagates to the caller.
+</Callout>
+
+### `label`
+
+```ts
+label: string | undefined
+```
+
+Section header rendered in the prompt. Defaults to `name` when omitted. Use this to give the LLM a human-readable name for the scope's context section.
+
+### `tools`
+
+```ts
+tools: Tool[] | undefined
+```
+
+Tools contributed by this scope. When the scope is registered, its tools become callable by the LLM. When the scope is unregistered or disabled, they disappear from the model's view on the next iteration.
+
+### `context`
+
+```ts
+context: (() => unknown) | undefined
+```
+
+Resolver for the scope's context payload. See [Context Injection](#context-injection).
+
+### `injection`
+
+```ts
+injection: ContextInjectionStrategy | undefined
+```
+
+Where the resolved context lands. Defaults to `'system'`. See [Strategies](#strategies).
+
+### `enabled`
+
+```ts
+enabled: (() => boolean) | undefined
+```
+
+Predicate that gates the scope. When omitted, the scope is always available. Re-evaluated at request build. Throws are coerced to `false` — a broken predicate hides the scope, never crashes the loop. See [Conditional Availability](#conditional-availability).

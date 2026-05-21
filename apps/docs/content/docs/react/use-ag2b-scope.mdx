@@ -1,0 +1,79 @@
+---
+title: useAg2bScope
+---
+
+Register a [`Scope`](/docs/primitives/scope) on the surrounding agent for the component's lifetime.
+
+```ts
+function useAg2bScope(config: ScopeConfig, deps?: unknown[]): void
+```
+
+<Callout type="warn" title="Reactivity rules">
+**Always-fresh** — `enabled`, `context`. The hook re-reads the latest closure on every loop iteration, so inline arrows can close over reactive state without re-registering the scope.
+
+**Captured at mount** — `name`, `label`, `injection`, `tools`. Tools coming from [`useAg2bTool`](/docs/react/use-ag2b-tool) are reference-tracked, so changes there cascade automatically. Pass `deps` only for state the config reads that doesn't fit either path.
+</Callout>
+
+## Usage
+
+### Registering a scope
+
+Pass a [`ScopeConfig`](/docs/primitives/scope#configuration). The Scope is created on mount and unregistered on unmount:
+
+```tsx
+function PullRequestScope() {
+  const pr = usePullRequest();
+
+  const approve = useAg2bTool({
+    name: 'approvePR',
+    description: 'Approve the current pull request.',
+    parameters: z.object({ comment: z.string().optional() }),
+    handler: ({ comment }) => pr.approve(comment),
+  });
+
+  useAg2bScope({ name: 'pullRequest', tools: [approve] });
+  return null;
+}
+```
+
+### Context resolver
+
+`context` runs every loop iteration and feeds dynamic state into the outgoing LLM request. Always-fresh — inline arrows read the latest snapshot:
+
+```tsx
+useAg2bScope({
+  name: 'pullRequest',
+  label: 'Pull request',
+  tools: [approve],
+  context: () => ({ // [!code highlight]
+    title: pr.title, // [!code highlight]
+    files: pr.files.length, // [!code highlight]
+    status: pr.status, // [!code highlight]
+  }),
+});
+```
+
+### Conditional availability
+
+`enabled` gates the whole scope — tools and context both disappear when it returns `false`. Always-fresh, same as `context`:
+
+```tsx
+useAg2bScope({
+  name: 'pullRequest',
+  tools: [approve],
+  enabled: () => pr.status === 'open', // [!code highlight]
+});
+```
+
+For *per-tool* gating instead of whole-scope gating, put the gate on the tool itself — see [`useAg2bTool`](/docs/react/use-ag2b-tool#conditional-availability).
+
+### Tool deps cascade
+
+Tools created via [`useAg2bTool`](/docs/react/use-ag2b-tool) are tracked by reference. When a Tool re-creates (e.g., its Zod schema reads a reactive value via the `deps` arg), the Scope picks up the new reference automatically — no need to list tools in the Scope's `deps`:
+
+```tsx
+const comment = useAg2bTool({ ... }, [maxLen]); // Tool re-creates on maxLen change
+useAg2bScope({ name: 'pullRequest', tools: [comment] }); // Scope auto-cascades
+```
+
+Pass `deps` to `useAg2bScope` only to force a re-register from external state the config doesn't read.

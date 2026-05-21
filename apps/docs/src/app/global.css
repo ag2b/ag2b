@@ -1,0 +1,56 @@
+@import 'tailwindcss';
+@import 'fumadocs-ui/css/neutral.css';
+@import 'fumadocs-ui/css/preset.css';
+@import "@heroui/styles";
+
+html {
+  scrollbar-gutter: stable;
+}
+
+html > body[data-scroll-locked] {
+  margin-right: 0px !important;
+  --removed-body-scroll-bar-size: 0px !important;
+}
+
+:root,
+[data-theme="light"] {
+  /* --core-color:  oklch(62.066% 0.08005 104.247); */
+  --core-color:  oklch(52.966% 0.06908 130.519);
+  --react-color: oklch(55.454% 0.10691 228.425 / 0.8);
+  --vue-color:   oklch(63.149% 0.12349 159.853);
+}
+
+.dark,
+[data-theme="dark"] {
+  --core-color:  oklch(82.138% 0.11576 130.48);
+  --react-color: oklch(83.628% 0.11738 217.06);
+  --vue-color:   oklch(63.149% 0.12349 159.853);
+}
+
+@theme inline {
+  --color-react: var(--react-color);
+  --color-vue: var(--vue-color);
+}
+
+/* Framework theming — override --accent and --accent-foreground at <html>
+   level so HeroUI's :root chain (--color-accent, --color-accent-hover,
+   --color-accent-soft, etc.) computes against our color via color-mix().
+   :has(body.X) lets us target html based on body's class without
+   hydration tricks. */
+html:has(body.core) {
+  --color-fd-primary: var(--core-color);
+  --accent: var(--core-color);
+  --accent-foreground: var(--snow);
+}
+
+html:has(body.react) {
+  --color-fd-primary: var(--react-color);
+  --accent: var(--react-color);
+  --accent-foreground: var(--snow);
+}
+
+html:has(body.vue) {
+  --color-fd-primary: var(--vue-color);
+  --accent: var(--vue-color);
+  --accent-foreground: var(--snow);
+}

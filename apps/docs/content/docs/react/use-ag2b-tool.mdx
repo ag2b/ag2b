@@ -1,0 +1,69 @@
+---
+title: useAg2bTool
+---
+
+Build a [Tool](/docs/primitives/tool).
+
+```ts
+function useAg2bTool<P extends z.ZodObject, R>(
+  config: ToolConfig<P, R>,
+  deps?: unknown[]
+): Tool<P, R>
+```
+
+<Callout type="warn" title="Reactivity rules">
+**Always-fresh** — `handler`, `enabled`. The hook re-reads the latest closure on every invocation, so inline arrows can close over reactive state without remounting the tool.
+
+**Captured at mount** — `description`, `parameters`. If either reads reactive state, list those values in `deps` so the tool remounts on change.
+</Callout>
+
+## Usage
+
+### Building a tool
+
+Pass a [`ToolConfig`](/docs/primitives/tool#configuration). The hook returns a stable `Tool` that you hand to a scope:
+
+```tsx
+function PullRequestTools() {
+  const pr = usePullRequest();
+
+  const approve = useAg2bTool({
+    name: 'approvePR',
+    description: 'Approve the current pull request.',
+    parameters: z.object({ comment: z.string().optional() }),
+    handler: ({ comment }) => pr.approve(comment),
+  });
+
+  useAg2bScope({ name: 'pullRequest', tools: [approve] });
+  return null;
+}
+```
+
+### Conditional availability
+
+`enabled` gates the tool dynamically. Always-fresh along with `handler` — both see the latest store snapshot without listing reactive values in `deps`:
+
+```tsx
+const approve = useAg2bTool({
+  name: 'approvePR',
+  description: 'Approve the current pull request.',
+  parameters: z.object({ comment: z.string().optional() }),
+  enabled: () => pr.status === 'open', // [!code highlight]
+  handler: ({ comment }) => pr.approve(comment),
+});
+```
+
+### Reactive captured values
+
+If `description` or `parameters` reads reactive state — a translated string, a Zod constraint pulled from props — list those values in `deps`:
+
+```tsx
+const comment = useAg2bTool({
+  name: 'commentOnPR',
+  description: t('tool.commentOnPR.description'),
+  parameters: z.object({ body: z.string().max(maxLen) }),
+  handler: ({ body }) => pr.comment(body),
+}, [t, maxLen]); // [!code highlight]
+```
+
+Forget `deps` and the tool keeps serving the original `description` / `parameters` to the LLM even after the values change. `handler` and `enabled` stay current regardless.

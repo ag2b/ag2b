@@ -1,0 +1,17 @@
+{
+  "title": "Core",
+  "description": "The missing runtime",
+  "icon": "Package",
+  "root": true,
+  "pages": [
+    "---Introduction---",
+    "what-is-ag2b",
+    "index",
+    "---Runtime---",
+    "...runtime",
+    "---Primitives---",
+    "...primitives",
+    "---",
+    "providers"
+  ]
+}

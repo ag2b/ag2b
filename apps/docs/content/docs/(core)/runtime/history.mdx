@@ -1,0 +1,149 @@
+---
+title: History
+---
+
+**History** is the conversation as a flat list of messages — user, assistant, and tool — in the order they entered [the loop](/docs/runtime/the-loop).
+
+## Usage
+
+### Reading
+
+```ts
+getSnapshot(): ChatMessage[]
+```
+
+Returns an immutable array — the same reference between mutations.
+
+```ts
+const messages = agent.history.getSnapshot();
+console.log(`${messages.length} messages so far`);
+```
+
+### Subscribing
+
+```ts
+subscribe(listener: () => void): () => void
+```
+
+The listener fires after every push during the loop and after `reset` / `restore`. Returns an unsubscribe function.
+
+```ts
+const unsubscribe = agent.history.subscribe(() => {
+  render(agent.history.getSnapshot());
+});
+
+// later
+unsubscribe();
+```
+
+### Resetting
+
+```ts
+reset(): void
+```
+
+Clears every message and notifies subscribers once.
+
+<Callout type="warn">
+Calling `reset` while a `chat` / `chatStream` is in flight is undefined behavior — the next loop iteration would read the mutated snapshot mid-flow. Reset between chats only.
+</Callout>
+
+
+```ts
+agent.history.reset();
+```
+
+### Restoring
+
+```ts
+restore(messages: ChatMessage[]): void
+```
+
+Replace the entire history — e.g., loading a saved conversation:
+
+<Callout type="warn">
+Calling `restore` while a `chat` / `chatStream` is in flight is undefined behavior — the next loop iteration would read the mutated snapshot mid-flow. Reset between chats only.
+</Callout>
+
+```ts
+const savedMessages = agent.history.getSnapshot();
+
+agent.history.restore(savedMessages);
+```
+
+## Messages
+
+Every message in the history is one of three shapes — a user prompt, an assistant reply, or a tool result:
+
+```ts
+type ChatMessage = UserMessage | AssistantMessage | ToolMessage;
+```
+
+<Callout type="info" title="Where is SystemMessage?">
+Because each provider wires system prompt differently, the agent keeps it on [AgentConfig](/docs/runtime#system) and lets each [Provider](/docs/providers) serialize it however its wire format expects.
+</Callout>
+
+### `UserMessage`
+
+```ts
+type UserMessage = {
+  role: 'user';
+  content: string;
+};
+```
+
+A message sent by the user.\
+Pushed by agent at the start of each call.
+
+- `content` — raw user prompt passed to `agent.chat(message)` or `agent.chatStream(message)`.
+
+### `AssistantMessage`
+```ts
+type AssistantMessage = {
+  role: 'assistant';
+  content?: string;
+  reasoning?: string;
+  calls?: AssistantToolCall[];
+  metadata?: Record<string, unknown>;
+};
+```
+
+A message returned by the assistant.\
+Pushed once per loop iteration, after the provider responds.
+
+- **`content`** — final text for this turn. Absent on tool-call-only turns.
+- **`reasoning`** — reasoning / thinking trace if the provider emitted one.
+- **`calls`** — tool calls the LLM requested. Each entry is an [`AssistantToolCall`](#assistanttoolcall).
+- **`metadata`** — provider-specific data preserved across persistence. Internal — consumers don't read it.
+
+### `AssistantToolCall`
+
+```ts
+type AssistantToolCall = {
+  id: string;
+  name: string;
+  arguments: Record<string, unknown>;
+};
+```
+
+A tool invocation requested by the LLM.
+
+- **`id`** — unique identifier for this call. Matches `ToolMessage.id` on the corresponding result.
+- **`name`** — name of the tool the LLM wants to execute.
+- **`arguments`** — parsed arguments from the LLM.
+
+### `ToolMessage`
+
+```ts
+type ToolMessage = {
+  role: 'tool';
+  id: string;
+  content: string;
+};
+```
+
+A message containing the result of a tool execution, sent back to the LLM.\
+Pushed once per executed tool call.
+
+- `id` — matches the `AssistantToolCall.id` of the call this is answering.
+- `content` — is the JSON-stringified return value (or error payload on failure).

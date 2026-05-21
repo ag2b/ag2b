@@ -1,0 +1,22 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "dist",
+    "rootDir": "src",
+    "types": ["vitest/globals"],
+    "paths": {
+      "@/agent": ["./src/agent"],
+      "@/provider": ["./src/provider"],
+      "@/messages": ["./src/messages"],
+      "@/history": ["./src/history.ts"],
+      "@/scope": ["./src/scope"],
+      "@/tool": ["./src/tool"],
+      "@/hooks": ["./src/hooks"],
+      "@/errors": ["./src/errors"],
+      "@/types": ["./src/types.ts"],
+    }
+  },
+  "include": [
+    "src/**/*",
+  ],
+}

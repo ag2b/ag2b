@@ -1,0 +1,86 @@
+---
+title: Scope Registry
+---
+import { Chip } from '@heroui/react';
+
+The agent works with its [Scopes](/docs/primitives/scope) via the **Scope Registry** — each one a named bundle of tools and context that the loop reads on every iteration.
+
+## Usage
+
+### Registering
+
+```ts
+register(scope: Scope): () => void
+unregister(name: string): void
+```
+
+`register` returns an idempotent disposer. Call it to remove the scope, or use the named form.
+
+```ts
+import { agent } from './agent';
+import { pullRequest } from './pull-request';
+
+const dispose = agent.scopes.register(pullRequest);
+
+// later
+dispose();
+// or
+agent.scopes.unregister('pullRequest');
+```
+
+<Callout type="warn" title="You often don't need to unregister">
+If availability depends on state (role, feature flag, route), prefer the [`enabled`](/docs/primitives/scope#conditional-availability) predicate — it gates the scope dynamically without re-registering when conditions flip.
+
+Reach for `unregister` only when the scope's lifetime genuinely ends.
+</Callout>
+
+### Reading
+
+```ts
+getSnapshot(): Scope[]
+get(name: string): Scope | undefined
+```
+
+`getSnapshot` returns an immutable array — same reference between mutations.\
+`get(name)` looks up a single scope by `name`, or `undefined` if not registered.
+
+```ts
+const scopes = agent.scopes.getSnapshot();
+console.log(`${scopes.length} scope(s) active`);
+
+const pullRequest = agent.scopes.get('pullRequest');
+```
+
+### Subscribing
+
+```ts
+subscribe(listener: () => void): () => void
+```
+
+The listener fires after every `register` / `unregister`. Returns an unsubscribe function.
+
+```ts
+const unsubscribe = agent.scopes.subscribe(() => {
+  render(agent.scopes.getSnapshot());
+});
+
+// later
+unsubscribe();
+```
+
+
+## Hooks
+
+The agent fires these around registry mutations. See [Hooks](/docs/runtime/hooks) for full signatures and examples:
+
+- [`onScopeRegister`](/docs/runtime/hooks#onscoperegister) — fires after `register(scope)` commits a scope.
+- [`onScopeUnregister`](/docs/runtime/hooks#onscopeunregister) — fires after `unregister(name)` removes a scope.
+
+## Runtime Errors
+
+### `Ag2bError`
+
+Thrown by `register` on a collision — setup-time only, not recoverable.
+
+- **Scope name** — another scope with the same `name` is already registered.
+- **Tool name** — a tool in the incoming scope shares a `name` with a tool already in another registered scope.

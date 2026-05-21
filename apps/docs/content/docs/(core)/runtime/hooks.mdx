@@ -1,0 +1,374 @@
+---
+title: Hooks
+---
+import { Chip } from '@heroui/react';
+
+**Hooks** are the agent's lifecycle extension contract. Each one fires at a specific point in [the loop](/docs/runtime/the-loop). Handlers can be sync or async — the agent awaits each one.
+
+## Usage
+
+```ts
+addHook<K extends keyof AgentHooks>(event: K, hook: AgentHooks[K]): () => void
+```
+
+Returns an idempotent disposer.
+
+```ts
+const dispose = agent.addHook('onMessage', (ctx) => {
+  if (ctx.message.role === 'assistant') {
+    console.log('assistant said:', ctx.message.content);
+  }
+});
+
+// later
+dispose();
+```
+
+### Observer vs Interceptor
+
+| Kind | Effect |
+|---|---|
+| <Chip color="default" variant="soft" size="md">Observer</Chip> | Side-effect only — logging, metrics, UI updates. |
+| <Chip color="accent" variant="soft" size="md">Interceptor</Chip> | Modify the in-flight value or short-circuit downstream. |
+
+**Observers** receive the event context and return `void`. The loop ignores their return value.
+
+**Interceptors** receive the context and can return a modified value. Each one in the chain sees what the previous returned, so transformations compose:
+
+```ts
+// trim whitespace
+agent.addHook('onResponse', (ctx) => ({
+  response: { ...ctx.response, content: ctx.response.content?.trim() },
+}));
+
+// runs after the trim hook, sees the trimmed content
+agent.addHook('onResponse', (ctx) => ({
+  response: { ...ctx.response, content: ctx.response.content?.toUpperCase() },
+}));
+```
+
+An interceptor returning nothing (`void`) leaves the value unchanged — handy when you want to observe an interceptor phase without modifying it.
+
+### Firing Order
+
+Hooks fire in **registration order**, awaited one at a time. Observers run sequentially, interceptors compose pipeline-style.
+
+### Short-Circuit
+**Short-circuit** is available on [`preRequest`](/docs/runtime/hooks#prerequest) and [`preToolCall`](/docs/runtime/hooks#pretoolcall) — returning a terminal value skips the rest of the chain and the downstream step (provider call, tool handler).
+The other interceptors always drain every registered hook.
+
+```ts
+// Hook A — cache check, short-circuits on hit
+agent.addHook('preRequest', (ctx) => {
+  const cached = cache.get(hash(ctx.request));
+  if (cached) return { response: cached };
+});
+
+// Hook B — only runs when A returns void
+agent.addHook('preRequest', (ctx) => ({
+  request: { ...ctx.request, system: ctx.request.system + '\nBe concise.' },
+}));
+```
+
+| Interceptor | Short-circuit on |
+|---|---|
+| `preRequest` | `{ response }` |
+| `preToolCall` | `{ result }` or `{ error }` |
+| `onResponse` | — always drains |
+| `onToolCallResult` | — always drains |
+| `onToolCallError` | — always drains |
+
+### Throwing in handlers
+
+Hook throws are **not recoverable**. They propagate up to the loop, fire [`onChatError`](#onchaterror), and re-throw to the `chat()` / `chatStream()` caller — the LLM never sees what went wrong, the conversation ends.
+
+<Callout type="warn" title="Two exceptions">
+- [`onChatError`](#onchaterror) and [`onChatAbort`](#onchatabort) — throws inside the handler are caught and ignored. The chat error or abort that fired the hook still propagates to the `chat()` / `chatStream()` caller — your handler can't suppress it.
+- [`onScopeRegister`](#onscoperegister) and [`onScopeUnregister`](#onscopeunregister) — fire outside a chat call. Throws become unhandled promise rejections. If you want to suppress, wrap the hook body in `try` / `catch`.
+</Callout>
+
+For conditions the LLM can recover from, **return** a typed value instead of throwing. The tool short-circuit pattern is the canonical example:
+
+```ts
+// ✓ Permission check via short-circuit — tool message lands, loop continues.
+agent.addHook('preToolCall', (ctx) => {
+  if (!user.canRun(ctx.tool.name)) {
+    return { error: new Error('Not permitted') };
+  }
+});
+
+// ✗ Same check via throw — terminates the chat, caller sees the throw.
+agent.addHook('preToolCall', (ctx) => {
+  if (!user.canRun(ctx.tool.name)) {
+    throw new Error('Not permitted');
+  }
+});
+```
+
+Reserve throws for **unrecoverable** conditions — misconfiguration, programmer error caught in validation — where ending the chat is the right outcome.
+
+## Chat Lifecycle
+
+### `onChatStart`
+<Chip color="default" variant="soft" size="md">Observer</Chip>
+
+```ts
+type OnChatStartCtx = {
+  message: string;
+  signal?: AbortSignal;
+};
+```
+
+Fires once at the start of `chat()` / `chatStream()`, before the user message is appended to history.
+
+```ts
+agent.addHook('onChatStart', (ctx) => {
+  console.log('chat started:', ctx.message);
+});
+```
+
+### `onChatDone`
+<Chip color="default" variant="soft" size="md">Observer</Chip>
+
+```ts
+type OnChatDoneCtx = {
+  response: AgentResponse;
+};
+```
+
+Mutually exclusive with `onChatAbort` and `onChatError`.
+
+Fires when the chat completes successfully — assistant message is in history, response is about to return.
+
+```ts
+agent.addHook('onChatDone', (ctx) => {
+  console.log('chat done:', ctx.response.finishReason);
+});
+```
+
+### `onChatAbort`
+<Chip color="default" variant="soft" size="md">Observer</Chip>
+
+```ts
+type OnChatAbortCtx = {
+  reason?: unknown;
+};
+```
+
+Mutually exclusive with `onChatDone` and `onChatError`.
+
+Fires when the chat is cancelled via the abort signal.
+
+```ts
+agent.addHook('onChatAbort', (ctx) => {
+  console.log('chat cancelled:', ctx.reason);
+});
+```
+
+### `onChatError`
+<Chip color="default" variant="soft" size="md">Observer</Chip>
+
+```ts
+type OnChatErrorCtx = {
+  error: unknown;
+};
+```
+
+Mutually exclusive with `onChatDone` and `onChatAbort`.
+
+Fires when the chat ends with a non-abort error — max iterations, provider throw, or any hook throw (except `onChatError` and `onChatAbort` themselves).
+
+```ts
+agent.addHook('onChatError', (ctx) => {
+  console.log('chat failed:', ctx.error);
+});
+```
+
+## Iteration
+
+### `preRequest`
+<Chip color="accent" variant="soft" size="md">Interceptor</Chip>
+
+```ts
+type PreRequestCtx = {
+  iteration: number; // 0-indexed
+  request: ProviderRequest;
+  signal?: AbortSignal;
+};
+
+type PreRequestReturn =
+  | void
+  | { request: ProviderRequest }
+  | { response: ProviderResponse };
+```
+
+Fires before each provider call. Modify the outgoing request or short-circuit with a synthetic response.
+
+Cache-hit short-circuit:
+
+```ts
+agent.addHook('preRequest', (ctx) => {
+  const cached = cache.get(hash(ctx.request));
+  if (cached) return { response: cached };
+});
+```
+
+### `onResponse`
+<Chip color="accent" variant="soft" size="md">Interceptor</Chip>
+
+```ts
+type OnResponseCtx = {
+  iteration: number;
+  request: ProviderRequest;
+  response: ProviderResponse;
+  signal?: AbortSignal;
+};
+
+type OnResponseReturn = void | { response: ProviderResponse };
+```
+
+Fires after the LLM returns (or after a `preRequest` short-circuit supplies a response), before the assistant message is appended to history. Replace the `response` to rewrite content, tool calls, or `finishReason`.
+
+```ts
+agent.addHook('onResponse', (ctx) => {
+  cache.set(hash(ctx.request), ctx.response);
+});
+```
+
+### `onMessage`
+<Chip color="default" variant="soft" size="md">Observer</Chip>
+
+```ts
+type OnMessageCtx = {
+  message: ChatMessage;
+};
+```
+
+Fires after every message commit to history. Three occasions per iteration:
+
+1. The user message at the very start (iteration `0`).
+2. The assistant message after `onResponse`.
+3. Each tool message after `onToolCallResult` / `onToolCallError`.
+
+```ts
+agent.addHook('onMessage', (ctx) => {
+  if (ctx.message.role === 'tool') {
+    console.log('tool result:', ctx.message.id);
+  }
+});
+```
+
+### `preToolCall`
+<Chip color="accent" variant="soft" size="md">Interceptor</Chip>
+
+```ts
+type PreToolCallCtx = {
+  call: AssistantToolCall;
+  tool: Tool;
+  scope: Scope;
+};
+
+type PreToolCallReturn =
+  | void
+  | { call: AssistantToolCall }
+  | { result: unknown }
+  | { error: unknown };
+```
+
+Fires before each tool handler runs. Modify the call args, short-circuit with a `result`, or short-circuit with an `error`. Skipped when the tool is unknown — that case routes directly to `onToolCallError`.
+
+Cached-result short-circuit:
+
+```ts
+agent.addHook('preToolCall', (ctx) => {
+  if (ctx.tool.name === 'fetch_weather') {
+    const cached = weatherCache.get(ctx.call.arguments.city as string);
+    if (cached) return { result: cached };
+  }
+});
+```
+
+### `onToolCallResult`
+<Chip color="accent" variant="soft" size="md">Interceptor</Chip>
+
+```ts
+type OnToolCallResultCtx = {
+  call: AssistantToolCall;
+  tool: Tool;
+  scope: Scope;
+  result: unknown;
+};
+
+type OnToolCallResultReturn = void | { result: unknown };
+```
+
+Fires after a tool handler returns successfully (or a `preToolCall` short-circuit supplies a result), before the tool message is serialized into history. Replace the `result` to redact or transform.
+
+```ts
+agent.addHook('onToolCallResult', (ctx) => {
+  if (ctx.tool.name === 'list_users') {
+    return { result: redactEmails(ctx.result) };
+  }
+});
+```
+
+### `onToolCallError`
+<Chip color="accent" variant="soft" size="md">Interceptor</Chip>
+
+```ts
+type OnToolCallErrorCtx = {
+  call: AssistantToolCall;
+  tool?: Tool;
+  scope?: Scope;
+  error: unknown;
+};
+
+type OnToolCallErrorReturn = void | { error: unknown };
+```
+
+Fires when a tool call errors — handler throw, validation failure, unknown tool, disabled tool, or `preToolCall` short-circuit with `{ error }`.
+Replace the `error` to wrap, rewrite, or classify.
+
+```ts
+agent.addHook('onToolCallError', (ctx) => {
+  if (ctx.error instanceof Ag2bToolValidationError) {
+    return { error: new Error(`Bad arguments for ${ctx.call.name}`) };
+  }
+});
+```
+
+## Scope Registry
+
+### `onScopeRegister`
+<Chip color="default" variant="soft" size="md">Observer</Chip>
+
+```ts
+type OnScopeRegisterCtx = {
+  scope: Scope;
+};
+```
+
+Fires after `agent.scopes.register(scope)` commits the scope.
+
+```ts
+agent.addHook('onScopeRegister', (ctx) => {
+  console.log('scope active:', ctx.scope.name);
+});
+```
+
+### `onScopeUnregister`
+<Chip color="default" variant="soft" size="md">Observer</Chip>
+
+```ts
+type OnScopeUnregisterCtx = {
+  scope: Scope;
+};
+```
+
+Fires after `agent.scopes.unregister(name)` removes a scope.
+
+```ts
+agent.addHook('onScopeUnregister', (ctx) => {
+  console.log('scope removed:', ctx.scope.name);
+});
+```

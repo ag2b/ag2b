@@ -1,0 +1,64 @@
+---
+title: What is AG2B
+description: Introducing AG2B - the missing runtime
+icon: MessageCircleQuestionMark
+---
+import { Activity, Atom, Braces, Package, Puzzle, Replace } from 'lucide-react';
+
+<section id="ag2b-definition">
+**AG2B** <span className='text-fd-muted-foreground text-sm'>(Agent to Browser)</span> is a client-side agentic runtime.
+The agent runs where your app does — in the browser. The server's role can range from a thin LLM proxy to a layer that extends the client runtime.
+</section>
+
+## What you get
+
+<Cards>
+  <Card icon={<Atom />} title="Agent primitives"
+        description="Building blocks that live next to your components and stores." />
+  <Card icon={<Braces />} title="End-to-end typed tools"
+        description="Zod schemas validate at runtime and type your handler." />
+  <Card icon={<Activity />} title="Open lifecycle"
+        description="Observe or intercept every boundary in the loop." />
+  <Card icon={<Replace />} title="Provider-agnostic"
+        description="Swap LLM providers with one line — built-in or your own." />
+  <Card icon={<Package />} title="Plain TypeScript core"
+        description="No framework lock-in. Drop it into anything." />
+  <Card icon={<Puzzle />} title="Framework bindings"
+        description="Per-framework bindings." />
+</Cards>
+
+## Why client-side
+
+Most agent libraries put their runtimes on the server — that's where LLM SDKs first landed, and where most teams already shipped their AI features.
+
+The runtime can also live where the user already is — the browser already runs your app, holds the state, owns the session.
+
+AG2B replaces only the part where the server owns *the loop itself* — iterations, tool choice, the stop decision. Everything around that, you keep.
+
+### Addition, not replacement
+
+AG2B is for what the user can already reach. It reads from whatever state you already use (Vanilla, Zustand, Pinia, etc.) and calls your existing client functions.
+
+Anything the user can trigger from the UI — including backend calls — the LLM can trigger too. Tasks with no client surface stay on the backend.
+
+### What the server can do
+
+What's left for the server is up to you. At minimum a proxy keeping your API key out of the bundle. Beyond that: rate limiting, quota tracking, caching, model routing, RAG, audit logging, anything else you'd run behind your own API.
+
+### Same problem, different paths
+Take RAG. A server-runtime library does retrieval on the server — that's the only place it can run.
+
+<Callout type="idea" title="AG2B is client-side, but it lets you choose where RAG lives:">
+- in the browser, intercepting the outgoing request through AG2B's hook system,
+- or on the server in your proxy before forwarding.
+</Callout>
+
+Pick the side that fits your data and your latency budget.
+
+## Benefits of client-side
+
+- **The browser is where your app already lives.** State, handlers, the user's session, the DOM — all of it is already here.
+- **Tools are the code you already wrote.** Your store actions, your fetch wrappers, your click handlers. No second tool registry, no server-side duplication to keep in sync.
+- **Live state, no roundtrip.** Tools read your current store directly — what the UI renders this turn is what the LLM sees this turn.
+- **Native browser surface.** Clipboard, file picker, geolocation, IndexedDB, WebRTC, the DOM. Tools call them directly, a server-side agent can't.
+- **Same auth.** No service account, no separate auth path — the same cookies, tokens, and headers your UI sends.

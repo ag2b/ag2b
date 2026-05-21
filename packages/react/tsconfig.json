@@ -1,0 +1,17 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "dist",
+    "rootDir": "src",
+    "types": ["vitest/globals"],
+    "jsx": "react-jsx",
+    "paths": {
+      "@/provider": ["./src/provider"],
+      "@/hooks": ["./src/hooks"],
+      "@/internal": ["./src/internal"],
+    }
+  },
+  "include": [
+    "src/**/*",
+  ],
+}

@@ -1,0 +1,70 @@
+---
+title: useAg2bAgent
+---
+
+Returns the [`Agent`](/docs/runtime) instance from the surrounding [`<Ag2bProvider>`](/docs/react/provider). Stable reference across renders — use for imperative access when the dedicated hooks don't fit.
+
+```ts
+function useAg2bAgent(): Agent
+```
+
+<Callout type="warn" title="Not reactive">
+Reads off the agent — `history.getSnapshot()`, `scopes.getSnapshot()`, etc. — return current values but don't re-render when they change. For reactive reads, use [`useAg2bHistory`](/docs/react/use-ag2b-history) or [`useAg2bScopes`](/docs/react/use-ag2b-scopes).
+</Callout>
+
+## Usage
+
+### History mutations
+
+The reactive [`useAg2bHistory`](/docs/react/use-ag2b-history) is read-only. To clear, replace, or export the conversation, go through `agent.history`:
+
+```tsx
+function NewChatButton() {
+  const agent = useAg2bAgent();
+  return <button onClick={() => agent.history.reset()}>New chat</button>;
+}
+
+function ExportButton() {
+  const agent = useAg2bAgent();
+  return (
+    <button onClick={() => download(agent.history.getSnapshot())}>
+      Export
+    </button>
+  );
+}
+```
+
+See [History](/docs/runtime/history) for `reset` / `restore` semantics.
+
+### Imperative agent calls
+
+For the typical "send a message, render the response, show loading state" path, use [`useAg2bChat`](/docs/react/use-ag2b-chat) or [`useAg2bChatStream`](/docs/react/use-ag2b-chat-stream) — they manage the in-flight state for you.
+
+Reach for `useAg2bAgent` when the call originates outside the React data flow — a global event listener, a third-party SDK callback, a side-effect on mount:
+
+```tsx
+function SlashCommandListener() {
+  const agent = useAg2bAgent();
+
+  useEffect(() => {
+    const handler = async (e: CustomEvent<{ prompt: string }>) => {
+      const response = await agent.chat(e.detail.prompt);
+      window.dispatchEvent(new CustomEvent('app:response', { detail: response }));
+    };
+    window.addEventListener('app:slash-command', handler as EventListener);
+    return () => window.removeEventListener('app:slash-command', handler as EventListener);
+  }, [agent]);
+
+  return null;
+}
+```
+
+### Prefer the lifecycle hooks where they fit
+
+Registering scopes, tools, or chat-loop hooks via `agent.scopes.register` / `agent.addHook` works, but you'll need to wire up cleanup yourself. The dedicated wrappers handle register + unregister across the component's lifetime:
+
+- [`useAg2bScope`](/docs/react/use-ag2b-scope) — register / unregister a scope.
+- [`useAg2bTool`](/docs/react/use-ag2b-tool) — register a single tool.
+- [`useAg2bHook`](/docs/react/use-ag2b-hook) — register a chat-loop hook.
+
+Reach for `useAg2bAgent` for these only when you need raw access — installing a plugin once at app start, mutating internals from an effect, etc.

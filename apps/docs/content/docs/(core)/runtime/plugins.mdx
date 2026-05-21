@@ -1,0 +1,129 @@
+---
+title: Plugins
+---
+
+A **Plugin** wires up the agent in one shot — [hooks](/docs/runtime/hooks), [scopes](/docs/runtime/scope-registry), or any custom logic you want to attach.
+
+## Usage
+
+```ts
+import type { Ag2bPlugin } from '@ag2b/core';
+
+const logger: Ag2bPlugin = (agent) => {
+  const offStart = agent.addHook('onChatStart', (ctx) => console.log('→', ctx.message));
+  const offDone = agent.addHook('onChatDone', (ctx) => console.log('←', ctx.response.content));
+
+  return () => {
+    offStart();
+    offDone();
+  };
+};
+```
+
+Install with `agent.use(plugin)`:
+
+```ts
+use(plugin: Ag2bPlugin): Promise<Ag2bPluginCleanup | undefined>
+```
+
+The returned cleanup tears the plugin down:
+
+```ts
+const cleanup = await agent.use(logger);
+
+// later
+cleanup?.();
+```
+
+### Async Setup
+
+`agent.use()` awaits the plugin, so async plugins work the same way. Use this when setup needs IO before registering hooks — fetching config, opening a connection, etc.
+
+```ts
+const remoteFlags: Ag2bPlugin = async (agent) => {
+  const flags = await fetch('/api/flags').then((r) => r.json());
+
+  return agent.addHook('preRequest', (ctx) => {
+    if (flags.cacheEnabled) {
+      const cached = cache.get(hash(ctx.request));
+      if (cached) return { response: cached };
+    }
+  });
+};
+
+await agent.use(remoteFlags); // [!code highlight]
+```
+
+Awaiting `use()` ensures setup errors surface to the caller before any chat starts.
+
+### Registering Scopes
+
+A plugin can register [scopes](/docs/runtime/scope-registry) too — useful when a feature's tools, context, and lifecycle ship together. The `register()` disposer doubles as the plugin's cleanup:
+
+```ts
+import { Scope, Tool } from '@ag2b/core';
+import { z } from 'zod/v4';
+
+export const appearance: Ag2bPlugin = (agent) => {
+  const setBackground = new Tool({
+    name: 'setBackground',
+    description: 'Change the page background color.',
+    parameters: z.object({
+      color: z.string().describe('Any valid CSS color (name, hex, rgb, etc.)'),
+    }),
+    handler: ({ color }) => {
+      document.body.style.backgroundColor = color;
+    },
+  });
+
+  const scope = new Scope({
+    name: 'appearance',
+    tools: [setBackground],
+  });
+
+  return agent.scopes.register(scope);
+};
+```
+
+## Plugin Contract
+
+### `Ag2bPlugin`
+
+```ts
+type Ag2bPlugin = (agent: Agent) => Awaitable<void | Ag2bPluginCleanup>;
+```
+
+A plugin receives the agent and wires it up. Return:
+
+- **`void`** — plugin is fire-and-forget; nothing to tear down.
+- **[`Ag2bPluginCleanup`](#ag2bplugincleanup)** — a function the caller invokes to undo the plugin's setup.
+
+May be sync or async — `agent.use()` awaits either.
+
+### `Ag2bPluginCleanup`
+
+```ts
+type Ag2bPluginCleanup = () => void;
+```
+
+Returned by a plugin to expose teardown.
+
+<Callout type="warn" title="Clean up every disposer the plugin created">
+- `addHook` disposers
+- `scopes.register` disposers
+- plus any external resources (intervals, listeners, connections) the plugin owns
+</Callout>
+
+```ts
+const telemetry: Ag2bPlugin = (agent) => {
+  const off1 = agent.addHook('onChatDone', (ctx) => report.done(ctx));
+  const off2 = agent.addHook('onChatError', (ctx) => report.error(ctx));
+  const interval = setInterval(flush, 5_000);
+
+  return () => {
+    off1();
+    off2();
+    clearInterval(interval);
+  };
+};
+```

@@ -1,0 +1,257 @@
+---
+title: Providers
+---
+import { Chip } from '@heroui/react';
+
+A **Provider** owns the network boundary — the agent hands it a normalized request (history, enabled tools, scope contexts, system) and receives a normalized response back.
+
+## Built-in
+
+<Cards>
+  <Card title="Anthropic" href="/docs/providers/anthropic">
+    Anthropic-compatible `/v1/messages` API
+  </Card>
+  <Card title="OpenAI" href="/docs/providers/openai">
+    OpenAI-compatible `/v1/chat/completions` API
+  </Card>
+</Cards>
+
+## Security
+
+<section id="provider-security">
+<Callout type="error" title="Never embed API keys in the client">
+The provider runs in the user's browser — anything you put into `baseURL`, `fetch` headers, or environment-substituted strings ships in your bundle to every user.
+
+Treat your LLM API key like a database password: keep it on a server, point `baseURL` at your own proxy, and let the proxy attach auth on the way out.
+</Callout>
+</section>
+
+## Request & Response
+
+The agent hands the provider two normalized shapes — `ProviderRequest` going in, `ProviderResponse` coming back. The provider's job is the translation between these and the LLM's wire format.
+
+### `ProviderRequest`
+
+Input to `runChat` and `runChatStream`.
+
+```ts
+type ProviderRequest = {
+  messages: ChatMessage[];
+  tools: Tool[];
+  contexts: ScopeContext[];
+  system?: string;
+};
+```
+
+- **`messages`** — conversation history snapshot.
+- **`tools`** — tools enabled for this turn.
+- **`contexts`** — [`ScopeContext[]`](/docs/primitives/scope#scope-context) available for this turn.
+- **`system`** — base system prompt.
+
+### `ProviderResponse`
+
+Return value of `runChat`. Everything is optional — fill in what the upstream API gave you.
+
+```ts
+type ProviderResponse = {
+  content?: string;
+  reasoning?: string;
+  calls?: AssistantToolCall[];
+  metadata?: Record<string, unknown>;
+  finishReason?: FinishReason;
+};
+```
+
+- **`content`** — final assistant text.
+- **`reasoning`** — reasoning / thinking trace when the model emits one.
+- **`calls`** — tool calls the LLM requested (`{ id, name, arguments }`).
+- **`metadata`** — provider-specific data that must survive history persistence (e.g., signed thinking blocks).
+- **`finishReason`** — `'stop' | 'tool_calls' | 'length'`.
+
+## Custom Provider
+
+Extend `AbstractProvider` for a sync-only API, or `StreamableProvider` if the backend supports streaming.
+
+### `ProviderConfig`
+
+Shape accepted by every provider's constructor:
+
+```ts
+type ProviderConfig = {
+  baseURL: string;
+  fetch?: typeof fetch;
+};
+```
+
+- **`baseURL`** — URL the provider POSTs to.
+- **`fetch`** — optional wrapper around `globalThis.fetch`. See [Custom Fetch](#custom-fetch).
+
+### `AbstractProvider`
+<Chip color="default" variant='soft' size="md">Sync</Chip>
+
+Implement `runChat` — receives the prepared `ProviderRequest`, returns a `ProviderResponse`.
+
+```ts
+import {
+  AbstractProvider,
+  Ag2bProviderRequestError,
+  type ProviderRequest,
+  type ProviderResponse,
+} from '@ag2b/core';
+
+export class MyProvider extends AbstractProvider {
+  protected async runChat(
+    request: ProviderRequest,
+    signal?: AbortSignal
+  ): Promise<ProviderResponse> {
+    const res = await this.fetch(this.baseURL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(toWireFormat(request)),
+      signal,
+    });
+
+    if (!res.ok) {
+      throw new Ag2bProviderRequestError(
+        `Request failed with status ${res.status}`,
+        res.status,
+        await res.text()
+      );
+    }
+
+    return fromWireFormat(await res.json());
+  }
+}
+```
+
+### `StreamableProvider`
+<Chip color="default" variant='soft' size="md">Sync</Chip>
+<Chip color="default" variant='soft' size="md">Stream</Chip>
+
+Extends `AbstractProvider`. Implement `runChat` and `runChatStream` — an async generator that yields `ProviderStreamChunk` events as the server streams.
+
+```ts
+import { StreamableProvider, type ProviderRequest, type ProviderStreamChunk } from '@ag2b/core';
+
+export class MyStreamingProvider extends StreamableProvider {
+  protected async runChat(
+    request: ProviderRequest,
+    signal?: AbortSignal
+  ): Promise<ProviderResponse> { /* … */ }
+
+  protected async *runChatStream(
+    request: ProviderRequest,
+    signal?: AbortSignal
+  ): AsyncGenerator<ProviderStreamChunk> {
+    // parse the stream and yield ProviderStreamChunk events
+  }
+}
+```
+
+#### Stream Events
+
+`runChatStream` yields one of four event shapes. Yield as soon as each fragment arrives — the agent forwards them onward without buffering.
+
+**`provider_content_delta`** — a chunk of assistant text.
+
+```ts
+type ProviderContentDelta = {
+  type: 'provider_content_delta';
+  delta: string;
+};
+```
+
+**`provider_reasoning_delta`** — a chunk of reasoning / thinking text. Keep on its own channel — consumers render reasoning separately from content.
+
+```ts
+type ProviderReasoningDelta = {
+  type: 'provider_reasoning_delta';
+  delta: string;
+};
+```
+
+**`provider_tool_call_delta`** — incremental tool call. First chunk for an `index` carries `id` and `name`, later chunks carry argument JSON deltas to concatenate.
+
+```ts
+type ProviderToolCallDelta = {
+  type: 'provider_tool_call_delta';
+  index: number;
+  id?: string;
+  name?: string;
+  argumentsDelta: string;
+};
+```
+
+**`provider_stream_done`** — final event, yielded exactly once when the upstream stream completes.
+
+```ts
+type ProviderStreamDone = {
+  type: 'provider_stream_done';
+  finishReason: FinishReason;
+  metadata?: Record<string, unknown>;
+};
+```
+
+## Preparing Request
+
+Providers can transform the `ProviderRequest` before `runChat` / `runChatStream` sees it. Override `prepareRequest` to shape the request for your provider's wire format — rewrite messages, inject provider-specific fields, or re-encode scope contexts.
+
+```ts
+protected prepareRequest(request: ProviderRequest): ProviderRequest {
+  return {
+    ...request,
+    system: customEncode(request.system, request.contexts),
+  };
+}
+```
+
+The default implementation inlines each [scope context](/docs/primitives/scope#context-injection) into `messages` / `system`.
+
+<Callout type="warn">
+`prepareRequest` must be a pure transformation — no I/O, no side effects.
+</Callout>
+
+Calling `super.prepareRequest` is optional — an override owns the full transformation.
+
+## Custom Fetch
+
+Every provider accepts a `fetch` option via [`ProviderConfig`](#providerconfig).
+
+<Callout type="warn">
+Forwarding a short-lived access token is the recommended pattern — see [Security](#provider-security). Your proxy at `baseURL` validates the token, checks per-user permissions, then attaches the real LLM API key before forwarding upstream. The user's browser never sees the key.
+</Callout>
+
+```ts
+import { Agent, OpenAiProvider } from '@ag2b/core';
+
+const authedFetch: typeof fetch = (input, init) =>
+  fetch(input, {
+    ...init,
+    headers: {
+      ...init?.headers,
+      Authorization: `Bearer ${getAccessToken()}`,
+    },
+  });
+
+const agent = new Agent({
+  provider: new OpenAiProvider({
+    baseURL: '/api/llm',
+    model: 'gpt-4o',
+    fetch: authedFetch,
+  }),
+});
+```
+
+The wrapper receives the same `(input, init)` arguments as `globalThis.fetch` and must return a `Response`. Forward `init` so the agent's `AbortSignal` still cancels in-flight requests.
+
+## Runtime Errors
+
+Custom providers should throw these so callers can catch at a stable boundary.
+
+### `Ag2bProviderRequestError`
+
+Thrown when the provider returns a non-OK HTTP status. Carries `.status` and the raw response `.body`.
+
+### `Ag2bProviderResponseError`
+
+Thrown when the response payload is malformed — no choices, unparseable tool arguments, missing stream body, mid-stream error events.

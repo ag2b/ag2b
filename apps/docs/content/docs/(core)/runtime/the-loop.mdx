@@ -1,0 +1,50 @@
+---
+title: The Loop
+---
+
+**The loop** is the core of AG2B's runtime — the cycle that turns a single LLM call into an agent.
+
+## Before the loop
+
+1. Fire [`onChatStart`](/docs/runtime/hooks#onchatstart). Carries the user message and abort signal.
+2. Commit the user message to history. Fires [`onMessage`](/docs/runtime/hooks#onmessage).
+
+## One iteration explained
+
+A pass through the loop runs in four phases.
+
+### Request [step]
+
+1. Build the request — history snapshot, enabled tools, scope contexts, base system prompt.
+2. Fire [`preRequest`](/docs/runtime/hooks#prerequest). Hooks can modify the request or short-circuit with a synthetic response.
+3. Call the provider. Skipped if `preRequest` supplied a response.
+
+### Response [step]
+
+4. Fire [`onResponse`](/docs/runtime/hooks#onresponse). Hooks can replace the response before the agent uses it.
+5. Commit the assistant message to history. Fires [`onMessage`](/docs/runtime/hooks#onmessage).
+
+### Tool handling [step]
+
+6. No tool calls? The loop ends — fire [`onChatDone`](/docs/runtime/hooks#onchatdone) and return the response.
+7. Tool calls? Run sequentially. For each:
+    - Fire [`preToolCall`](/docs/runtime/hooks#pretoolcall). Hooks can modify args or short-circuit with a result/error.
+    - Execute the handler. Throws in handlers don't terminate the chat — they become tool messages the LLM sees on the next turn.
+    - Fire [`onToolCallResult`](/docs/runtime/hooks#ontoolcallresult) on success, [`onToolCallError`](/docs/runtime/hooks#ontoolcallerror) on failure.
+    - Commit the tool message. Fires [`onMessage`](/docs/runtime/hooks#onmessage).
+
+### Continue or stop [step]
+
+8. Increment the iteration counter and start the next pass — unless the counter hits [`maxIterations`](/docs/runtime#maxiterations), in which case the loop throws [`Ag2bMaxIterationsError`](/docs/runtime#ag2bmaxiterationserror).
+
+## Stop Conditions
+
+A chat ends in one of five ways. The terminal hook depends on what stopped it:
+
+| Trigger | Hook |
+|---|---|
+| LLM returns a turn without tool calls | `onChatDone` |
+| `AbortSignal` aborts the run | `onChatAbort` |
+| Counter reaches [`maxIterations`](/docs/runtime#maxiterations) | `onChatError` |
+| Provider throws (HTTP, malformed payload, network) | `onChatError` |
+| Any non-terminal hook throws | `onChatError` |
