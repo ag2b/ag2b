@@ -3,17 +3,33 @@ import { notFound } from 'next/navigation';
 import { ImageResponse } from 'next/og';
 
 import { appName } from '@/lib/shared';
-import { getPageImage, source } from '@/lib/source';
+import { getPageImage, getSection, source } from '@/lib/source';
 
 export const revalidate = false;
 
+const sectionColors = {
+  core: '#abd483',
+  react: '#60dcfb',
+  vue: '#33a06f',
+} as const;
+
 export async function GET(_req: Request, { params }: RouteContext<'/og/docs/[...slug]'>) {
   const { slug } = await params;
-  const page = source.getPage(slug.slice(0, -1));
+  const pageSlug = slug.slice(0, -1);
+  const page = source.getPage(pageSlug);
   if (!page) notFound();
 
+  const section = getSection(pageSlug[0]) as keyof typeof sectionColors;
+  const primaryTextColor = sectionColors[section];
+
   return new ImageResponse(
-    <DefaultImage title={page.data.title} description={page.data.description} site={appName} />,
+    <DefaultImage
+      title={page.data.title}
+      description={page.data.description}
+      site={appName}
+      primaryColor={`${primaryTextColor}4d`}
+      primaryTextColor={primaryTextColor}
+    />,
     {
       width: 1200,
       height: 630,

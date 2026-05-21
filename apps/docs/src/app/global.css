@@ -14,7 +14,6 @@ html > body[data-scroll-locked] {
 
 :root,
 [data-theme="light"] {
-  /* --core-color:  oklch(62.066% 0.08005 104.247); */
   --core-color:  oklch(52.966% 0.06908 130.519);
   --react-color: oklch(55.454% 0.10691 228.425 / 0.8);
   --vue-color:   oklch(63.149% 0.12349 159.853);
