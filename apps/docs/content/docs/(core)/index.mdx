@@ -5,7 +5,7 @@ icon: Rocket
 index: true
 ---
 import { SiReact, SiVuedotjs } from '@icons-pack/react-simple-icons';
-import { Brain, Cog, Layers, Repeat } from 'lucide-react';
+import { Brain, Cog, Layers, Puzzle, Repeat } from 'lucide-react';
 
 <include>what-is-ag2b.mdx#ag2b-definition</include>
 
@@ -20,6 +20,11 @@ AG2B has framework-specific libraries that ship as separate packages:
 <Cards>
   <Card icon={<SiReact className='text-react'/>} title="React" description="AG2B bindings for React" href="docs/react" />
   <Card icon={<SiVuedotjs className='text-vue'/>} title="Vue" description="Coming soon" />
+</Cards>
+
+And plugins work with any framework:
+<Cards>
+  <Card icon={<Puzzle />} title="WebMCP" description="Bridge tools into the browser's WebMCP API" href="docs/plugins/webmcp" />
 </Cards>
 
 ## Getting started

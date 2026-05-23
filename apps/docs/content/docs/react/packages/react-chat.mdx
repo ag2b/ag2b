@@ -1,0 +1,101 @@
+---
+title: '@ag2b/react-chat'
+description: Drop-in chat UI for @ag2b/react
+---
+
+<Callout type="warn" title="Experimental">
+This is an experimental package. API shape may drift.
+</Callout>
+
+## Requirements
+
+- `@ag2b/react` and `@ag2b/core`
+- `react` `>= 18`
+- `react-markdown` `>= 9`
+- `remark-gfm` `>= 4`
+
+## Quickstart
+
+### Install [step]
+
+```npm
+npm i @ag2b/react-chat react-markdown remark-gfm
+```
+
+### Import the stylesheet [step]
+
+```ts title="main.tsx"
+import '@ag2b/react-chat/styles.css';
+```
+
+### Drop the popup inside your provider [step]
+
+```tsx title="main.tsx"
+import { Ag2bProvider } from '@ag2b/react';
+import { Ag2bPopup } from '@ag2b/react-chat';
+import { createRoot } from 'react-dom/client';
+
+import { agent } from './agent';
+import { App } from './App';
+
+import '@ag2b/react-chat/styles.css';
+
+createRoot(document.getElementById('root')!).render(
+  <Ag2bProvider agent={agent}>
+    <App />
+    <Ag2bPopup mode="streaming" showReasoning />
+  </Ag2bProvider>,
+);
+```
+
+That's it — the FAB appears in the bottom-right corner, the panel opens on click, and prompts route through the agent.
+
+
+## Ag2bPopup
+### Props
+
+```ts
+type Ag2bPopupProps = {
+  placement?: 'bottom-right' | 'bottom-left' | 'top-right' | 'top-left';
+  mode?: 'streaming' | 'synchronous';
+  showModeToggle?: boolean;
+  showReasoning?: boolean;
+  placeholder?: string;
+  classNames?: Ag2bPopupClassNames;
+};
+```
+
+| Prop             | Default          | Description                                                                                              |
+| ---------------- | ---------------- | -------------------------------------------------------------------------------------------------------- |
+| `placement`      | `'bottom-right'` | Which corner the FAB anchors to. One of `'bottom-right'`, `'bottom-left'`, `'top-right'`, `'top-left'`.  |
+| `mode`           | `'streaming'`    | One of `'synchronous`, `'streaming'`.                                                                    |
+| `showModeToggle` | `false`          | Renders a header control that flips between streaming and synchronous at runtime.                        |
+| `showReasoning`  | `false`          | Renders assistant `reasoning` (when the provider emits it) as a collapsible block above each message.    |
+| `placeholder`    | —                | Composer placeholder text.                                                                               |
+| `classNames`     | —                | Per-slot class overrides — see [Slots](#slots).                                                          |
+
+### Slots
+
+Each entry on `classNames` is appended to the corresponding slot's built-in class.
+
+<Callout type="info" title="Tailwind">
+Suffix utilities with `!` (e.g. `'bg-red-500!'`) so they win over the built-in slot styles.
+</Callout>
+
+```ts
+type Ag2bPopupClassNames = {
+  fab?: string;
+  panel?: string;
+  header?: string;
+  body?: string;
+  message?: string;
+  userMessage?: string;
+  assistantMessage?: string;
+  toolCall?: string;
+  reasoning?: string;
+  composer?: string;
+  textarea?: string;
+  sendButton?: string;
+  stopButton?: string;
+};
+```

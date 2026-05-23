@@ -7,15 +7,10 @@
     "---Introduction---",
     "index",
     "---Provider---",
-    "provider",
+    "...provider",
     "---Hooks---",
-    "use-ag2b-chat",
-    "use-ag2b-chat-stream",
-    "use-ag2b-history",
-    "use-ag2b-scopes",
-    "use-ag2b-tool",
-    "use-ag2b-scope",
-    "use-ag2b-hook",
-    "use-ag2b-agent"
+    "...hooks",
+    "---Packages---",
+    "...packages"
   ]
 }

@@ -1,0 +1,9 @@
+@import 'tailwindcss';
+@import '@heroui/styles';
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}

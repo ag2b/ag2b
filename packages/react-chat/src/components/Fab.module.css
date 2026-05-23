@@ -1,0 +1,21 @@
+.fab {
+  position: fixed;
+  z-index: var(--ag2b-z-fab);
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  border: 1px solid var(--ag2b-border);
+  background: var(--ag2b-bg);
+  color: var(--ag2b-fg);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: var(--ag2b-shadow);
+  cursor: pointer;
+  font: var(--ag2b-font);
+}
+.fab:hover { background: var(--ag2b-bg-hover); }
+.bottomRight { right: 16px; bottom: 16px; }
+.bottomLeft  { left:  16px; bottom: 16px; }
+.topRight    { right: 16px; top:    16px; }
+.topLeft     { left:  16px; top:    16px; }

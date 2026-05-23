@@ -1,0 +1,27 @@
+.wrapper {
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.bubble {
+  align-self: flex-start;
+  max-width: 90%;
+  background: var(--ag2b-bg-elevated);
+  color: var(--ag2b-fg);
+  padding: 8px 12px;
+  border-radius: var(--ag2b-radius);
+  word-break: break-word;
+}
+.bubble :where(p, ul, ol, pre, code) { margin: 4px 0; }
+.bubble :where(p):first-child { margin-top: 0; }
+.bubble :where(p):last-child { margin-bottom: 0; }
+.bubble :where(pre) {
+  background: var(--ag2b-bg);
+  padding: 8px;
+  border-radius: var(--ag2b-radius-sm);
+  overflow-x: auto;
+  font-family: var(--ag2b-font-mono);
+  font-size: 12px;
+}
+.bubble :where(code) { font-family: var(--ag2b-font-mono); font-size: 0.9em; }

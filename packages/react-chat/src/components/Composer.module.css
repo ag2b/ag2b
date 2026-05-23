@@ -1,0 +1,38 @@
+.composer {
+  display: flex;
+  gap: 8px;
+  padding: 8px;
+  border-top: 1px solid var(--ag2b-border);
+  background: var(--ag2b-bg);
+}
+.textarea {
+  flex: 1;
+  resize: none;
+  border: 1px solid var(--ag2b-border);
+  border-radius: var(--ag2b-radius-sm);
+  background: var(--ag2b-bg);
+  color: var(--ag2b-fg);
+  font: inherit;
+  padding: 8px 10px;
+  outline: none;
+  min-height: 36px;
+  max-height: 160px;
+  overflow-y: auto;
+}
+.textarea:focus { border-color: var(--ag2b-accent); }
+.textarea:disabled { opacity: 0.6; cursor: not-allowed; }
+.button {
+  flex: 0 0 36px;
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: var(--ag2b-radius-sm);
+  background: var(--ag2b-accent);
+  color: var(--ag2b-accent-fg);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.button:disabled { opacity: 0.6; cursor: not-allowed; }
+.stop { background: var(--ag2b-danger); }

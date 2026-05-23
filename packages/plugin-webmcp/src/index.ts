@@ -1,0 +1,1 @@
+export { webmcp } from './plugin';

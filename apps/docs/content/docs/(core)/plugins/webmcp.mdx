@@ -1,0 +1,57 @@
+---
+title: WebMCP
+---
+
+<Callout type="warn" title="Experimental">
+This is an experimental package. API shape may drift.
+</Callout>
+
+`@ag2b/plugin-webmcp` bridges every [Tool](/docs/primitives/tool) on the agent into the browser's [WebMCP API](https://github.com/webmachinelearning/webmcp) — so the host browser agent can call the same tools your AG2B agent already uses.
+
+## Try it
+
+WebMCP isn't on by default anywhere. To exercise the bridge end-to-end:
+
+1. Open [flag settings](chrome://flags) in **Chrome 148.0.7778.56 or higher** (currently the only browser shipping WebMCP), enable **WebMCP for testing**, and restart.
+2. Install the [Model Context Tool Inspector](https://chromewebstore.google.com/detail/model-context-tool-inspec/gbpdfapgefenggkahomfgkhfehlcenpd) extension.
+3. Generate a Gemini API key at [Google AI Studio](https://aistudio.google.com/api-keys) and paste it into the extension's settings — the inspector needs it to invoke your bridged tools.
+
+## Installation
+
+```npm
+npm i @ag2b/plugin-webmcp
+```
+
+## Usage
+
+Install the plugin once, after scopes are registered:
+
+```ts
+import { createAgent, OpenAiProvider, Scope, Tool } from '@ag2b/core';
+import { webmcp } from '@ag2b/plugin-webmcp';
+import { z } from 'zod/v4';
+
+const setBackground = new Tool({
+  name: 'setBackground',
+  description: 'Change the page background color.',
+  parameters: z.object({
+    color: z.string().describe('Any valid CSS color (name, hex, rgb, etc.)'),
+  }),
+  handler: ({ color }) => {
+    document.body.style.backgroundColor = color;
+  },
+});
+
+const agent = createAgent({ provider: new OpenAiProvider({ baseURL: '/api/llm' }) });
+agent.scopes.register(new Scope({ name: 'appearance', tools: [setBackground] }));
+
+void agent.use(webmcp()); // [!code highlight]
+```
+
+Every tool registered with the agent — now and in the future — appears under `navigator.modelContext`. Unregister a [Scope](/docs/primitives/scope) and its tools disappear from WebMCP too.
+
+## What gets bridged
+
+- **Tools** — name, description, JSON Schema, and `execute` are mapped 1:1. Tool name validation, Zod validation, and `enabled` checks all run inside the bridged `execute` callback, so disabled tools reject with a descriptive error at call time.
+- **Scopes** — tracked by lifecycle: tools register on `onScopeRegister`, unregister via `AbortController.abort()` on `onScopeUnregister`.
+- **Scope [context](/docs/primitives/scope#context-injection)** — **not bridged.** WebMCP has no primitive for it.

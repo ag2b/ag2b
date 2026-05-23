@@ -12,6 +12,8 @@
     "---Primitives---",
     "...primitives",
     "---",
-    "providers"
+    "providers",
+    "---Plugins---",
+    "...plugins"
   ]
 }

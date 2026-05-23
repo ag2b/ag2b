@@ -1,0 +1,35 @@
+.badge {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--ag2b-border);
+  border-radius: var(--ag2b-radius-sm);
+  background: var(--ag2b-bg-elevated);
+  font-family: var(--ag2b-font-mono);
+  font-size: 12px;
+  margin: 4px 0;
+}
+.header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  cursor: pointer;
+  border: none;
+  background: none;
+  color: inherit;
+  width: 100%;
+  text-align: left;
+  font: inherit;
+}
+.header:hover { background: var(--ag2b-bg-hover); }
+.icon { width: 14px; display: inline-flex; }
+.name { font-weight: 600; }
+.status { color: var(--ag2b-fg-muted); }
+.error { color: var(--ag2b-danger); }
+.chevron { margin-left: auto; transition: transform 120ms ease; }
+.chevronOpen { transform: rotate(90deg); }
+.details { padding: 8px; border-top: 1px solid var(--ag2b-border); }
+.label { color: var(--ag2b-fg-muted); font-size: 11px; margin-top: 6px; }
+.label:first-child { margin-top: 0; }
+.code { margin: 2px 0 0 0; white-space: pre-wrap; word-break: break-word; }
+.errorBlock { color: var(--ag2b-danger); }

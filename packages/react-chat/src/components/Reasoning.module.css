@@ -1,0 +1,27 @@
+.wrapper {
+  margin: 4px 0;
+  border: 1px solid var(--ag2b-border);
+  border-radius: var(--ag2b-radius-sm);
+  background: var(--ag2b-bg-elevated);
+}
+.toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  width: 100%;
+  border: none;
+  background: none;
+  font: inherit;
+  color: var(--ag2b-fg-muted);
+  cursor: pointer;
+  text-align: left;
+}
+.chevron { transition: transform 120ms ease; }
+.chevronOpen { transform: rotate(90deg); }
+.body {
+  padding: 0 8px 8px 8px;
+  color: var(--ag2b-fg-muted);
+  font-size: 13px;
+  white-space: pre-wrap;
+}

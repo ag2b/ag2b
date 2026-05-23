@@ -1,0 +1,36 @@
+{
+  "name": "@ag2b/plugin-webmcp",
+  "version": "0.0.1",
+  "description": "AG2B plugin that bridges tools to the browser WebMCP API.",
+  "license": "MIT",
+  "author": "Alexey Vasyukov (@notmedia)",
+  "homepage": "https://ag2b.ai",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "vite build",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint",
+    "lint:fix": "eslint --fix",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage"
+  },
+  "peerDependencies": {
+    "@ag2b/core": "*"
+  },
+  "devDependencies": {
+    "@types/node": "25.9.1",
+    "jsdom": "29.1.1",
+    "vite": "8.0.14",
+    "vite-plugin-dts": "5.0.1",
+    "zod": "4.4.3"
+  }
+}

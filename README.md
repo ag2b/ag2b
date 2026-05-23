@@ -19,13 +19,6 @@ The agent runs where your app does — in the browser. The server's role can ran
 📦 **Plain TypeScript core** — No framework lock-in. Drop it into anything.\
 🧱 **Framework bindings** — Per-framework bindings.
 
-## Packages
-
-| Package | What it ships |
-|---|---|
-| [`@ag2b/core`](./packages/core) | The core - runtime and primitives |
-| [`@ag2b/react`](./packages/react) | AG2B bindings for React |
-
 ## Quickstart
 
 ### Install

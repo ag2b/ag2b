@@ -1,0 +1,21 @@
+.panel {
+  position: fixed;
+  z-index: var(--ag2b-z-panel);
+  width: 380px;
+  max-width: calc(100vw - 32px);
+  height: 560px;
+  max-height: calc(100vh - 96px);
+  display: flex;
+  flex-direction: column;
+  background: var(--ag2b-bg);
+  color: var(--ag2b-fg);
+  border: 1px solid var(--ag2b-border);
+  border-radius: var(--ag2b-radius);
+  box-shadow: var(--ag2b-shadow);
+  font: var(--ag2b-font);
+  overflow: hidden;
+}
+.bottomRight { right: 16px; bottom: 80px; }
+.bottomLeft  { left:  16px; bottom: 80px; }
+.topRight    { right: 16px; top:    80px; }
+.topLeft     { left:  16px; top:    80px; }

@@ -1,0 +1,11 @@
+.banner {
+  background: var(--ag2b-danger-bg);
+  color: var(--ag2b-danger);
+  border-top: 1px solid var(--ag2b-border);
+  padding: 6px 10px;
+  font-size: 12px;
+  display: flex;
+  gap: 6px;
+}
+.icon { flex: 0 0 auto; }
+.text { word-break: break-word; }

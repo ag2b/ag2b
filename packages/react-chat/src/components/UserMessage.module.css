@@ -1,0 +1,12 @@
+.bubble {
+  align-self: flex-end;
+  max-width: 80%;
+  background: var(--ag2b-accent);
+  color: var(--ag2b-accent-fg);
+  padding: 8px 12px;
+  border-radius: var(--ag2b-radius);
+  word-break: break-word;
+}
+.bubble :where(p, ul, ol, pre, code) { margin: 4px 0; }
+.bubble :where(p):first-child { margin-top: 0; }
+.bubble :where(p):last-child { margin-bottom: 0; }
