@@ -8,13 +8,15 @@ npm workspaces + Turborepo monorepo.
 
 ```
 packages/
-  core/    @ag2b/core   — runtime (Agent, Tool, Scope, providers, hooks, plugins)
-  react/   @ag2b/react  — React bindings (Ag2bProvider + 8 hooks)
+  core/           @ag2b/core           — runtime (Agent, Tool, Scope, providers, hooks, plugins)
+  react/          @ag2b/react          — React bindings (Ag2bProvider + 8 hooks)
+  react-chat/     @ag2b/react-chat     — drop-in chat UI (Ag2bPopup) on top of @ag2b/react
+  plugin-webmcp/  @ag2b/plugin-webmcp  — plugin: bridges agent tools to the browser WebMCP API (navigator.modelContext)
 apps/
-  docs/    Fumadocs (Next.js) documentation site
+  docs/           Fumadocs (Next.js) documentation site, hosted at https://ag2b.ai
+examples/
+  react-board/    end-to-end demo wiring core + react + react-chat + plugin-webmcp
 ```
-
-Docs site is hosted at https://ag2b.ai.
 
 ## Common commands
 
@@ -29,7 +31,7 @@ npm run test:watch
 npm run test:coverage
 ```
 
-Per-workspace (cd into `packages/core`, `packages/react`, or `apps/docs`):
+Per-workspace (cd into `packages/core`, `packages/react`, `packages/react-chat`, `packages/plugin-webmcp`, or `apps/docs`):
 
 ```bash
 npm run build
@@ -55,7 +57,7 @@ npm run dev         # next dev (Turbopack)
 
 - **Build**: vite per package (lib mode, emits `dist/`) → coordinated by `turbo build`.
 - **Test**: vitest, configured at `vitest.config.ts` (root) — `projects: ['packages/*']` discovers per-package configs.
-- **Lint**: eslint with `@notmedia/eslint-config`.
+- **Lint**: eslint with `notmedia-eslint-config`.
 - **Commits**: commitlint with `@commitlint/config-conventional` (enforced on `commit-msg` via lefthook).
 - **Pre-commit hooks** (lefthook, `lefthook.yml`): runs `typecheck → test → lint → build` piped. Don't bypass with `--no-verify` unless explicitly authorized — fix the underlying issue.
 - **Releases**: `@changesets/cli` (`.changeset/` directory).
@@ -116,6 +118,10 @@ A `Scope` bundles tools + an optional context resolver. Registered on the agent 
 - **Handler throws don't terminate the chat.** They're caught in `executeTool` and become tool messages (with `{ error: serializedError }` payload). The LLM sees the failure and can recover.
 - Validation errors (`Ag2bToolValidationError`), unknown-tool errors (`Ag2bUnknownToolError`), disabled-tool errors (`Ag2bDisabledToolError`) flow through `onToolCallError` the same way.
 
+### Plugins (`packages/core/src/agent/plugin.ts`)
+
+`Ag2bPlugin = (agent: Agent) => Awaitable<void | Ag2bPluginCleanup>`. Installed via `await agent.use(plugin)`, which awaits the setup function and returns the optional cleanup. Plugins typically call `agent.addHook(...)` one or more times in their body and return a cleanup that disposes those hooks plus any external resources (sockets, intervals, listeners). Async is for plugins that need setup before registering hooks (open a connection, fetch config). `@ag2b/plugin-webmcp` is the reference implementation.
+
 ### Public exports
 
 `packages/core/src/index.ts` is the source of truth for the public API surface. If a type or class isn't exported here, it's internal.
@@ -129,6 +135,20 @@ Key design:
 - **State subscription**: `useAg2bHistory` / `useAg2bScopes` use `useSyncExternalStore` for concurrent-safe reactive reads (hence the **React ≥ 18** requirement).
 - **Chat as state**: `useAg2bChat` / `useAg2bChatStream` manage in-flight state (`isPending`, `error`, abort handle) and auto-abort on unmount.
 - **`useAg2bChatStream.pendingMessage`**: derived from events (non-null only while the latest event is a content/reasoning delta) → `null` between iterations and after `agent_chat_done`. Consumers splice with `useAg2bHistory` via `[...messages, pendingMessage].filter(Boolean)` — no duplication of the just-committed assistant turn. Replaces earlier `content` / `reasoning` return fields that had a dual-purpose lifecycle (live during deltas + persisted post-commit) and caused visible duplication windows in conversation UIs.
+
+## Architecture — React chat UI
+
+`@ag2b/react-chat` is a drop-in chat surface built on `@ag2b/react`. Public export is `Ag2bPopup` (a floating action button + portal-mounted panel). It reads history via `useAg2bHistory` and drives sends through an internal `useChatController` that picks `useAg2bChat` or `useAg2bChatStream` based on `mode` (`'streaming' | 'sync'`). Markdown rendering uses `react-markdown` + `remark-gfm` (peer deps). Styles ship as a separate import (`@ag2b/react-chat/styles.css`); a theme CSS file is also bundled in the entry via `import '@/styles/theme.css'`. Peer deps: `@ag2b/core`, `@ag2b/react`, `react >=18`, `react-dom >=18`, `react-markdown >=9`, `remark-gfm >=4`.
+
+## Architecture — WebMCP plugin
+
+`@ag2b/plugin-webmcp` exports a single factory `webmcp(): Ag2bPlugin`. On `agent.use(webmcp())`:
+
+- No-ops if `navigator.modelContext` is unavailable (non-browser env or browser without WebMCP) — returns an empty cleanup.
+- Snapshots existing scopes and registers each `Tool` with `navigator.modelContext.registerTool(...)`, passing an `AbortSignal` per tool.
+- Subscribes to `onScopeRegister` / `onScopeUnregister` so later-added scopes get bridged automatically; unregistration aborts that scope's tool signals.
+- The bridged `execute` checks `tool.isEnabled() && scope.isEnabled()` at call time and throws `Tool "<name>" is disabled` if either is false — this surfaces gating to the host page rather than silently dropping.
+- Cleanup aborts every controller and detaches both hook listeners.
 
 ## Architecture — docs site
 
