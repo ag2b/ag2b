@@ -1,4 +1,5 @@
 import { Analytics } from '@vercel/analytics/next';
+import { SpeedInsights } from '@vercel/speed-insights/next';
 import { RootProvider } from 'fumadocs-ui/provider/next';
 import { Inter } from 'next/font/google';
 
@@ -16,6 +17,7 @@ export default function Layout({ children }: LayoutProps<'/'>) {
       <Body className="flex flex-col min-h-screen">
         <RootProvider>{children}</RootProvider>
         <Analytics />
+        <SpeedInsights />
       </Body>
     </html>
   );
