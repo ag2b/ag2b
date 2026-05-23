@@ -5,6 +5,9 @@
   "license": "MIT",
   "author": "Alexey Vasyukov (@notmedia)",
   "homepage": "https://ag2b.ai",
+  "publishConfig": {
+    "access": "public"
+  },
   "type": "module",
   "exports": {
     ".": {
