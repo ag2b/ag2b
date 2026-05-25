@@ -69,6 +69,7 @@ describe('Agent::chatStream', () => {
     const types = events.map((e) => e.type);
     expect(types).toEqual([
       'agent_chat_start',
+      'agent_tool_call_delta',
       'agent_content_end',
       'agent_tool_call_start',
       'agent_tool_call_result',

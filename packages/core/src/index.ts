@@ -13,6 +13,7 @@ export type {
   AgentReasoningDelta,
   AgentReasoningEnd,
   AgentContentEnd,
+  AgentToolCallDelta,
   AgentToolCallStart,
   AgentToolCallResult,
   AgentToolCallError,

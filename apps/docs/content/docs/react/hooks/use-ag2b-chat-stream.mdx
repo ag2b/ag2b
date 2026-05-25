@@ -70,7 +70,7 @@ function ChatWithIndicators() {
 
 ### Live assistant turn
 
-`pendingMessage` is the in-flight assistant turn — populated while content or reasoning deltas are arriving, `null` otherwise. The hook clears it the moment the iteration commits to history, so combining `pendingMessage` with [`useAg2bHistory`](/docs/react/use-ag2b-history) never duplicates the committed turn.
+`pendingMessage` is the in-flight assistant turn — populated while content, reasoning, or tool-call deltas are arriving, `null` otherwise. The hook clears it the moment the iteration commits to history, so combining `pendingMessage` with [`useAg2bHistory`](/docs/react/use-ag2b-history) never duplicates the committed turn.
 
 A two-iteration send where the LLM reasons, answers, calls a tool, then answers again:
 
@@ -80,6 +80,8 @@ A two-iteration send where the LLM reasons, answers, calls a tool, then answers 
 + agent_reasoning_delta "check..."      pendingMessage = { reasoning: "Let me check..." }
 + agent_content_delta   "I'll fetch "   pendingMessage = { content: "I'll fetch ", reasoning: "Let me check..." }
 + agent_content_delta   "the data."     pendingMessage = { content: "I'll fetch the data.", reasoning: "Let me check..." }
++ agent_tool_call_delta fetch '{"id":'  pendingMessage.calls = [{ name: "fetch", arguments: {} }]
++ agent_tool_call_delta       '1}'      pendingMessage.calls = [{ name: "fetch", arguments: { id: 1 } }]
 - agent_content_end                     pendingMessage = null   (iteration committed to history)
 
 // tool runs — pendingMessage stays null
@@ -90,7 +92,7 @@ A two-iteration send where the LLM reasons, answers, calls a tool, then answers 
 - agent_chat_done                       pendingMessage = null, response.content = "Got it: X is 42."
 ```
 
-Within an iteration, `pendingMessage.content` and `pendingMessage.reasoning` accumulate as deltas arrive. After [`agent_content_end`](/docs/runtime/chat#agent_content_end), the assistant turn is in history and `pendingMessage` is `null` until the next iteration's first delta. After [`agent_chat_done`](/docs/runtime/chat#agent_chat_done), the final values are also on `response`.
+Within an iteration, `pendingMessage.content`, `pendingMessage.reasoning`, and `pendingMessage.calls` accumulate as deltas arrive — streamed tool-call arguments parse best-effort, so an incomplete call shows `arguments: {}` until it finishes streaming. After [`agent_content_end`](/docs/runtime/chat#agent_content_end), the assistant turn is in history and `pendingMessage` is `null` until the next iteration's first delta. After [`agent_chat_done`](/docs/runtime/chat#agent_chat_done), the final values are also on `response`.
 
 ### Chat History
 
@@ -192,7 +194,7 @@ The last successful [`AgentResponse`](/docs/runtime/chat#agent-response). Persis
 pendingMessage: AssistantMessage | null
 ```
 
-The in-flight assistant turn — populated while content or reasoning deltas are arriving, `null` between iterations, during tool execution, and after [`agent_chat_done`](/docs/runtime/chat#agent_chat_done). Splices cleanly onto [`useAg2bHistory`](/docs/react/use-ag2b-history) with `[...messages, pendingMessage].filter(Boolean)` — no duplication of the committed turn. See [Live assistant turn](#live-assistant-turn).
+The in-flight assistant turn — populated while content, reasoning, or tool-call deltas are arriving, `null` between iterations, during tool execution, and after [`agent_chat_done`](/docs/runtime/chat#agent_chat_done). Carries `content`, `reasoning`, and any streamed tool `calls`. Splices cleanly onto [`useAg2bHistory`](/docs/react/use-ag2b-history) with `[...messages, pendingMessage].filter(Boolean)` — no duplication of the committed turn. See [Live assistant turn](#live-assistant-turn).
 
 ### `events`
 

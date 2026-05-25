@@ -50,7 +50,7 @@ describe('useChatController', () => {
     expect(result.current.isPending).toBe(false);
   });
 
-  it('aborts the active controller when mode changes mid-flight', () => {
+  it('aborts the active controller when mode changes mid-flight', async () => {
     const agent = makeStreamingAgent([
       [
         { type: 'provider_content_delta', delta: 'partial' },
@@ -62,29 +62,43 @@ describe('useChatController', () => {
       { wrapper: wrapper(agent), initialProps: { mode: 'streaming' } }
     );
 
+    let sendPromise: Promise<unknown> | undefined;
     act(() => {
-      void result.current.send('hi');
+      sendPromise = result.current.send('hi');
     });
     expect(result.current.isPending).toBe(true);
 
-    rerender({ mode: 'synchronous' });
+    // Switching mode aborts the in-flight controller; await the send settling
+    // inside act so its terminal state update doesn't leak past the test.
+    await act(async () => {
+      rerender({ mode: 'synchronous' });
+      await sendPromise?.catch(() => undefined);
+    });
 
     expect(result.current.isPending).toBe(false);
   });
 
-  it('aborts a pending synchronous chat when switching to streaming', () => {
+  it('aborts a pending synchronous chat when switching to streaming', async () => {
     const agent = createAgent({ provider: new HangingSyncProvider() });
     const { result, rerender } = renderHook(
       ({ mode }: { mode: 'streaming' | 'synchronous' }) => useChatController({ mode }),
       { wrapper: wrapper(agent), initialProps: { mode: 'synchronous' } }
     );
 
+    let sendPromise: Promise<unknown> | undefined;
     act(() => {
-      void result.current.send('hi');
+      sendPromise = result.current.send('hi');
     });
     expect(result.current.isPending).toBe(true);
 
+    // rerender (act-wrapped by RTL) runs the mode-change effect, which aborts the
+    // controller synchronously. The abort then rejects the in-flight chat, emitting
+    // a final `agent_chat_abort` event — drain that settling inside act so its
+    // setState doesn't leak past the test.
     rerender({ mode: 'streaming' });
+    await act(async () => {
+      await sendPromise?.catch(() => undefined);
+    });
 
     expect(result.current.isPending).toBe(false);
   });

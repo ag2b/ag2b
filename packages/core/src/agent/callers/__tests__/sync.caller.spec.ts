@@ -99,7 +99,40 @@ describe('createSyncCaller', () => {
       ]);
     });
 
-    it('emits no events when response has no content or reasoning', async () => {
+    it('fabricates one tool_call_delta per call, after any content', async () => {
+      const provider = new FakeProvider({
+        content: 'calling',
+        calls: [
+          { id: 'c1', name: 'sum', arguments: { a: 1 } },
+          { id: 'c2', name: 'sub', arguments: { b: 2 } },
+        ],
+        finishReason: 'tool_calls',
+      });
+      const sink = new RecordingSink();
+      const caller = createSyncCaller(provider, sink);
+
+      await caller(makeRequest());
+
+      expect(sink.events).toEqual([
+        { type: 'agent_content_delta', delta: 'calling' },
+        {
+          type: 'agent_tool_call_delta',
+          index: 0,
+          id: 'c1',
+          name: 'sum',
+          argumentsDelta: '{"a":1}',
+        },
+        {
+          type: 'agent_tool_call_delta',
+          index: 1,
+          id: 'c2',
+          name: 'sub',
+          argumentsDelta: '{"b":2}',
+        },
+      ]);
+    });
+
+    it('emits a tool_call_delta even when the response has no content or reasoning', async () => {
       const provider = new FakeProvider({
         calls: [{ id: 'c1', name: 'sum', arguments: { a: 1 } }],
         finishReason: 'tool_calls',
@@ -109,7 +142,15 @@ describe('createSyncCaller', () => {
 
       await caller(makeRequest());
 
-      expect(sink.events).toEqual([]);
+      expect(sink.events).toEqual([
+        {
+          type: 'agent_tool_call_delta',
+          index: 0,
+          id: 'c1',
+          name: 'sum',
+          argumentsDelta: '{"a":1}',
+        },
+      ]);
     });
   });
 });

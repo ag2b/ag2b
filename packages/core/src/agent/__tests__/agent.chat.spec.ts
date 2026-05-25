@@ -354,6 +354,7 @@ describe('agent.chat({ onEvent })', () => {
 
     expect(events.map((e) => e.type)).toEqual([
       'agent_chat_start',
+      'agent_tool_call_delta',
       'agent_content_end',
       'agent_tool_call_start',
       'agent_tool_call_result',

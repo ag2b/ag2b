@@ -94,14 +94,22 @@ describe('createStreamCaller', () => {
       ]);
     });
 
-    it('emits no events when response has no content or reasoning', async () => {
+    it('fabricates a tool_call_delta from a calls-only response', async () => {
       const provider = new SyncOnlyProvider({
         calls: [{ id: 'c1', name: 'sum', arguments: { a: 1 } }],
         finishReason: 'tool_calls',
       });
       const { events, response } = await runCaller(provider);
 
-      expect(events).toEqual([]);
+      expect(events).toEqual([
+        {
+          type: 'agent_tool_call_delta',
+          index: 0,
+          id: 'c1',
+          name: 'sum',
+          argumentsDelta: '{"a":1}',
+        },
+      ]);
       expect(response.calls).toHaveLength(1);
     });
   });
@@ -210,11 +218,56 @@ describe('createStreamCaller', () => {
       ]);
       const { events } = await runCaller(provider);
 
-      // reasoning_end fires before any tool-call buffering work, even though
-      // tool deltas don't produce agent events themselves.
+      // reasoning_end fires before the first tool-call delta is emitted.
       expect(events).toEqual([
         { type: 'agent_reasoning_delta', delta: 'choosing tool' },
         { type: 'agent_reasoning_end' },
+        {
+          type: 'agent_tool_call_delta',
+          index: 0,
+          id: 'c1',
+          name: 'sum',
+          argumentsDelta: '{"a":1}',
+        },
+      ]);
+    });
+
+    it('emits agent_tool_call_delta for each provider tool call delta', async () => {
+      const provider = new StreamingProvider([
+        {
+          type: 'provider_tool_call_delta',
+          index: 0,
+          id: 'c1',
+          name: 'sum',
+          argumentsDelta: '{"a":1,',
+        },
+        { type: 'provider_tool_call_delta', index: 0, argumentsDelta: '"b":2}' },
+        { type: 'provider_stream_done', finishReason: 'tool_calls' },
+      ]);
+      const { events, response } = await runCaller(provider);
+
+      expect(events).toEqual([
+        {
+          type: 'agent_tool_call_delta',
+          index: 0,
+          id: 'c1',
+          name: 'sum',
+          argumentsDelta: '{"a":1,',
+        },
+        { type: 'agent_tool_call_delta', index: 0, argumentsDelta: '"b":2}' },
+      ]);
+      expect(response.calls).toEqual([{ id: 'c1', name: 'sum', arguments: { a: 1, b: 2 } }]);
+    });
+
+    it('emits the first tool_call_delta even when its argumentsDelta is empty', async () => {
+      const provider = new StreamingProvider([
+        { type: 'provider_tool_call_delta', index: 0, id: 'c1', name: 'noop', argumentsDelta: '' },
+        { type: 'provider_stream_done', finishReason: 'tool_calls' },
+      ]);
+      const { events } = await runCaller(provider);
+
+      expect(events).toEqual([
+        { type: 'agent_tool_call_delta', index: 0, id: 'c1', name: 'noop', argumentsDelta: '' },
       ]);
     });
 
@@ -230,9 +283,8 @@ describe('createStreamCaller', () => {
         { type: 'provider_tool_call_delta', index: 0, argumentsDelta: '"b":2}' },
         { type: 'provider_stream_done', finishReason: 'tool_calls' },
       ]);
-      const { events, response } = await runCaller(provider);
+      const { response } = await runCaller(provider);
 
-      expect(events).toEqual([]); // tool deltas don't emit agent events
       expect(response.calls).toEqual([{ id: 'c1', name: 'sum', arguments: { a: 1, b: 2 } }]);
       expect(response.finishReason).toBe('tool_calls');
     });

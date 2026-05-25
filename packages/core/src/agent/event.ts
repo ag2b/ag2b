@@ -87,6 +87,26 @@ export type AgentContentEnd = {
   type: 'agent_content_end';
 };
 
+/**
+ * A chunk of a streaming tool call from the assistant. Pairs with {@link AgentContentDelta}
+ * but for tool calls. Streamed chunk-by-chunk under {@link Agent.chatStream} — the first chunk
+ * for a given `index` carries `id` and `name`, subsequent chunks carry only `argumentsDelta`
+ * (a partial JSON string); under {@link Agent.chat} with `onEvent` each call is delivered as a
+ * single chunk with `id`, `name`, and the full `argumentsDelta`. Lets UIs render a tool-call
+ * badge the moment a call starts arriving, before it's fully buffered and committed to history.
+ */
+export type AgentToolCallDelta = {
+  type: 'agent_tool_call_delta';
+  /** Tool call index in the response. Identifies which call a chunk belongs to across parallel calls. */
+  index: number;
+  /** Tool call ID. Present on the first chunk for this `index` only. */
+  id?: string;
+  /** Tool name. Present on the first chunk for this `index` only. */
+  name?: string;
+  /** Partial JSON string of the tool call arguments. Concatenate all chunks for the full JSON. */
+  argumentsDelta: string;
+};
+
 /** Emitted when a tool call is about to execute. */
 export type AgentToolCallStart = {
   type: 'agent_tool_call_start';
@@ -123,6 +143,7 @@ export type AgentEvent =
   | AgentContentEnd
   | AgentReasoningDelta
   | AgentReasoningEnd
+  | AgentToolCallDelta
   | AgentToolCallStart
   | AgentToolCallResult
   | AgentToolCallError;

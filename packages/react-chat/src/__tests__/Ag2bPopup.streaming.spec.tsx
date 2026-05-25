@@ -1,4 +1,4 @@
-import { act, fireEvent, render } from '@testing-library/react';
+import { fireEvent, render } from '@testing-library/react';
 
 import { Ag2bPopup } from '../Ag2bPopup';
 import { makeStreamingAgent, wrapper } from './fixtures';
@@ -13,7 +13,7 @@ describe('Ag2bPopup (streaming mode)', () => {
       ],
     ]);
     const Wrapper = wrapper(agent);
-    const { getByLabelText, getByRole, findAllByText } = render(
+    const { getByLabelText, getByRole, findByLabelText, getAllByText } = render(
       <Wrapper>
         <Ag2bPopup mode="streaming" />
       </Wrapper>
@@ -23,12 +23,11 @@ describe('Ag2bPopup (streaming mode)', () => {
     const textarea = getByRole('textbox') as HTMLTextAreaElement;
     fireEvent.change(textarea, { target: { value: 'hi' } });
 
-    await act(async () => {
-      fireEvent.keyDown(textarea, { key: 'Enter' });
-      await Promise.resolve();
-    });
+    fireEvent.keyDown(textarea, { key: 'Enter' });
 
-    const helloes = await findAllByText('hello');
-    expect(helloes.length).toBe(1);
+    // Wait for the stream to settle (composer returns to idle) so we assert the
+    // committed bubble, not the transient pending+committed duplication window.
+    await findByLabelText('Send');
+    expect(getAllByText('hello').length).toBe(1);
   });
 });

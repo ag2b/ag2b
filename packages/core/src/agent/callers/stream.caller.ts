@@ -73,6 +73,15 @@ export function createStreamCaller(provider: AbstractProvider, sink: EventSink):
             toolCallBuffers.set(event.index, buf);
           }
           buf.arguments += event.argumentsDelta;
+
+          sink.push({
+            type: 'agent_tool_call_delta',
+            index: event.index,
+            id: event.id,
+            name: event.name,
+            argumentsDelta: event.argumentsDelta,
+          });
+
           break;
         }
 

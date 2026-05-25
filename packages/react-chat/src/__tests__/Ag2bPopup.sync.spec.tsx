@@ -1,4 +1,4 @@
-import { act, fireEvent, render } from '@testing-library/react';
+import { fireEvent, render } from '@testing-library/react';
 
 import { Ag2bPopup } from '../Ag2bPopup';
 import { makeAgent, wrapper } from './fixtures';
@@ -17,10 +17,7 @@ describe('Ag2bPopup (synchronous mode)', () => {
     const textarea = getByRole('textbox') as HTMLTextAreaElement;
     fireEvent.change(textarea, { target: { value: 'hi' } });
 
-    await act(async () => {
-      fireEvent.keyDown(textarea, { key: 'Enter' });
-      await Promise.resolve();
-    });
+    fireEvent.keyDown(textarea, { key: 'Enter' });
 
     expect(await findByText('hi')).toBeTruthy();
     expect(await findByText('hello there')).toBeTruthy();

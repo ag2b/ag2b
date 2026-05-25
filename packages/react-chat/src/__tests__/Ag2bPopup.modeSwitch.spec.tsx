@@ -1,4 +1,4 @@
-import { act, fireEvent, render } from '@testing-library/react';
+import { fireEvent, render, waitFor } from '@testing-library/react';
 
 import { Ag2bPopup } from '../Ag2bPopup';
 import { makeStreamingAgent, wrapper } from './fixtures';
@@ -17,13 +17,10 @@ describe('Ag2bPopup (mid-flight mode switch)', () => {
     const textarea = getByRole('textbox') as HTMLTextAreaElement;
     fireEvent.change(textarea, { target: { value: 'hi' } });
 
-    await act(async () => {
-      fireEvent.keyDown(textarea, { key: 'Enter' });
-      await Promise.resolve();
-    });
+    fireEvent.keyDown(textarea, { key: 'Enter' });
 
     // Either Send is back (idle) or Stop is still visible (in-flight). Either is acceptable —
     // the point is the component didn't crash and reached a renderable state.
-    expect(queryByLabelText('Send') ?? queryByLabelText('Stop')).toBeTruthy();
+    await waitFor(() => expect(queryByLabelText('Send') ?? queryByLabelText('Stop')).toBeTruthy());
   });
 });

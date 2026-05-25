@@ -1,6 +1,6 @@
 import type { ProviderStreamChunk } from '@ag2b/core';
 import { Scope, Tool } from '@ag2b/core';
-import { act, renderHook } from '@testing-library/react';
+import { act, renderHook, waitFor } from '@testing-library/react';
 import z from 'zod/v4';
 
 import { makeStreamingAgent, wrapper } from '../../__tests__/fixtures';
@@ -144,19 +144,17 @@ describe('useAg2bChatStream', () => {
     const { result } = renderHook(() => useAg2bChatStream(), { wrapper: wrapper(agent) });
 
     let sendPromise: Promise<unknown> = Promise.resolve();
-    await act(async () => {
+    act(() => {
       sendPromise = result.current.send('hi');
-      // let the deltas flow through the iterator before we assert
-      await Promise.resolve();
-      await Promise.resolve();
-      await Promise.resolve();
     });
 
-    expect(result.current.pendingMessage).toEqual({
-      role: 'assistant',
-      content: 'Hello world',
-      reasoning: undefined,
-    });
+    await waitFor(() =>
+      expect(result.current.pendingMessage).toEqual({
+        role: 'assistant',
+        content: 'Hello world',
+        reasoning: undefined,
+      })
+    );
     expect(result.current.isPending).toBe(true);
 
     await act(async () => {
@@ -192,18 +190,17 @@ describe('useAg2bChatStream', () => {
     const { result } = renderHook(() => useAg2bChatStream(), { wrapper: wrapper(agent) });
 
     let sendPromise: Promise<unknown> = Promise.resolve();
-    await act(async () => {
+    act(() => {
       sendPromise = result.current.send('hi');
-      await Promise.resolve();
-      await Promise.resolve();
-      await Promise.resolve();
     });
 
-    expect(result.current.pendingMessage).toEqual({
-      role: 'assistant',
-      content: undefined,
-      reasoning: 'thinking…',
-    });
+    await waitFor(() =>
+      expect(result.current.pendingMessage).toEqual({
+        role: 'assistant',
+        content: undefined,
+        reasoning: 'thinking…',
+      })
+    );
 
     await act(async () => {
       release();
@@ -310,5 +307,250 @@ describe('useAg2bChatStream', () => {
       finishReason: 'stop',
     });
     expect(result.current.response?.reasoning).toBeUndefined();
+  });
+
+  it('exposes streamed tool calls in pendingMessage.calls before they commit', async () => {
+    const agent = makeStreamingAgent();
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+
+    vi.spyOn(agent, 'chatStream').mockImplementation(async function* () {
+      yield { type: 'agent_chat_start', message: 'go' };
+      yield {
+        type: 'agent_tool_call_delta',
+        index: 0,
+        id: 'c1',
+        name: 'echo',
+        argumentsDelta: '{"x":',
+      };
+      yield { type: 'agent_tool_call_delta', index: 0, argumentsDelta: '1}' };
+      await gate;
+      yield { type: 'agent_content_end' };
+      yield { type: 'agent_chat_done', response: { finishReason: 'tool_calls' } };
+    });
+
+    const { result } = renderHook(() => useAg2bChatStream(), { wrapper: wrapper(agent) });
+
+    let sendPromise: Promise<unknown> = Promise.resolve();
+    act(() => {
+      sendPromise = result.current.send('go');
+    });
+
+    await waitFor(() =>
+      expect(result.current.pendingMessage).toEqual({
+        role: 'assistant',
+        content: undefined,
+        reasoning: undefined,
+        calls: [{ id: 'c1', name: 'echo', arguments: { x: 1 } }],
+      })
+    );
+
+    await act(async () => {
+      release();
+      await sendPromise;
+    });
+
+    expect(result.current.pendingMessage).toBeNull();
+  });
+
+  it('surfaces a tool call with empty args while its arguments are still partial JSON', async () => {
+    const agent = makeStreamingAgent();
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+
+    vi.spyOn(agent, 'chatStream').mockImplementation(async function* () {
+      yield { type: 'agent_chat_start', message: 'go' };
+      yield {
+        type: 'agent_tool_call_delta',
+        index: 0,
+        id: 'c1',
+        name: 'echo',
+        argumentsDelta: '{"x":',
+      };
+      await gate;
+      yield { type: 'agent_content_end' };
+      yield { type: 'agent_chat_done', response: { finishReason: 'tool_calls' } };
+    });
+
+    const { result } = renderHook(() => useAg2bChatStream(), { wrapper: wrapper(agent) });
+
+    let sendPromise: Promise<unknown> = Promise.resolve();
+    act(() => {
+      sendPromise = result.current.send('go');
+    });
+
+    await waitFor(() =>
+      expect(result.current.pendingMessage?.calls).toEqual([
+        { id: 'c1', name: 'echo', arguments: {} },
+      ])
+    );
+
+    await act(async () => {
+      release();
+      await sendPromise;
+    });
+  });
+
+  it('starts a fresh tool-call buffer when a new turn begins with a tool call', async () => {
+    const agent = makeStreamingAgent();
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+
+    // Two iterations, each a tool-call-only turn. Tool indices reset per turn,
+    // so iteration 2's index-0 delta must NOT merge into (or be dropped by) the
+    // committed first-turn call — the pending buffer has to start fresh.
+    vi.spyOn(agent, 'chatStream').mockImplementation(async function* () {
+      yield { type: 'agent_chat_start', message: 'go' };
+      yield {
+        type: 'agent_tool_call_delta',
+        index: 0,
+        id: 'c1',
+        name: 'first',
+        argumentsDelta: '{}',
+      };
+      yield { type: 'agent_content_end' };
+      yield { type: 'agent_tool_call_start', call: { id: 'c1', name: 'first', arguments: {} } };
+      yield {
+        type: 'agent_tool_call_result',
+        call: { id: 'c1', name: 'first', arguments: {} },
+        result: null,
+      };
+      yield {
+        type: 'agent_tool_call_delta',
+        index: 0,
+        id: 'c2',
+        name: 'second',
+        argumentsDelta: '{"y":2}',
+      };
+      await gate;
+      yield { type: 'agent_content_end' };
+      yield { type: 'agent_chat_done', response: { finishReason: 'tool_calls' } };
+    });
+
+    const { result } = renderHook(() => useAg2bChatStream(), { wrapper: wrapper(agent) });
+
+    let sendPromise: Promise<unknown> = Promise.resolve();
+    act(() => {
+      sendPromise = result.current.send('go');
+    });
+
+    await waitFor(() =>
+      expect(result.current.pendingMessage?.calls).toEqual([
+        { id: 'c2', name: 'second', arguments: { y: 2 } },
+      ])
+    );
+
+    await act(async () => {
+      release();
+      await sendPromise;
+    });
+  });
+
+  it("resets content to the new turn's delta when a turn begins with content", async () => {
+    const agent = makeStreamingAgent();
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+
+    // Iteration 1 produces content + a tool call; iteration 2 opens with content.
+    // The pending turn must show only iteration 2's content — not appended to
+    // iteration 1's text, and not blanked out.
+    vi.spyOn(agent, 'chatStream').mockImplementation(async function* () {
+      yield { type: 'agent_chat_start', message: 'go' };
+      yield { type: 'agent_content_delta', delta: 'first' };
+      yield { type: 'agent_tool_call_delta', index: 0, id: 'c1', name: 't', argumentsDelta: '{}' };
+      yield { type: 'agent_content_end' };
+      yield { type: 'agent_tool_call_start', call: { id: 'c1', name: 't', arguments: {} } };
+      yield {
+        type: 'agent_tool_call_result',
+        call: { id: 'c1', name: 't', arguments: {} },
+        result: null,
+      };
+      yield { type: 'agent_content_delta', delta: 'second' };
+      await gate;
+      yield { type: 'agent_content_end' };
+      yield { type: 'agent_chat_done', response: { content: 'second', finishReason: 'stop' } };
+    });
+
+    const { result } = renderHook(() => useAg2bChatStream(), { wrapper: wrapper(agent) });
+
+    let sendPromise: Promise<unknown> = Promise.resolve();
+    act(() => {
+      sendPromise = result.current.send('go');
+    });
+
+    await waitFor(() =>
+      expect(result.current.pendingMessage).toEqual({
+        role: 'assistant',
+        content: 'second',
+        reasoning: undefined,
+        calls: undefined,
+      })
+    );
+
+    await act(async () => {
+      release();
+      await sendPromise;
+    });
+  });
+
+  it("resets reasoning to the new turn's delta when a turn begins with reasoning", async () => {
+    const agent = makeStreamingAgent();
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+
+    // Iteration 1 produces reasoning + content; iteration 2 opens with reasoning.
+    // The pending turn must show only iteration 2's reasoning, with the prior
+    // turn's content cleared.
+    vi.spyOn(agent, 'chatStream').mockImplementation(async function* () {
+      yield { type: 'agent_chat_start', message: 'go' };
+      yield { type: 'agent_reasoning_delta', delta: 'think1' };
+      yield { type: 'agent_reasoning_end' };
+      yield { type: 'agent_content_delta', delta: 'first' };
+      yield { type: 'agent_tool_call_delta', index: 0, id: 'c1', name: 't', argumentsDelta: '{}' };
+      yield { type: 'agent_content_end' };
+      yield { type: 'agent_tool_call_start', call: { id: 'c1', name: 't', arguments: {} } };
+      yield {
+        type: 'agent_tool_call_result',
+        call: { id: 'c1', name: 't', arguments: {} },
+        result: null,
+      };
+      yield { type: 'agent_reasoning_delta', delta: 'think2' };
+      await gate;
+      yield { type: 'agent_reasoning_end' };
+      yield { type: 'agent_content_delta', delta: 'second' };
+      yield { type: 'agent_content_end' };
+      yield { type: 'agent_chat_done', response: { content: 'second', finishReason: 'stop' } };
+    });
+
+    const { result } = renderHook(() => useAg2bChatStream(), { wrapper: wrapper(agent) });
+
+    let sendPromise: Promise<unknown> = Promise.resolve();
+    act(() => {
+      sendPromise = result.current.send('go');
+    });
+
+    await waitFor(() =>
+      expect(result.current.pendingMessage).toEqual({
+        role: 'assistant',
+        content: undefined,
+        reasoning: 'think2',
+        calls: undefined,
+      })
+    );
+
+    await act(async () => {
+      release();
+      await sendPromise;
+    });
   });
 });

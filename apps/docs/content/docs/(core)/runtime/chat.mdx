@@ -95,6 +95,7 @@ type AgentEvent =
   | AgentReasoningEnd
   | AgentContentDelta
   | AgentContentEnd
+  | AgentToolCallDelta
   | AgentToolCallStart
   | AgentToolCallResult
   | AgentToolCallError
@@ -103,7 +104,7 @@ type AgentEvent =
   | AgentChatError;
 ```
 
-Both modes emit every event — only the granularity of content and reasoning deltas differs.
+Both modes emit every event — only the granularity of content, reasoning, and tool-call deltas differs.
 
 Most events fire **per loop iteration**, not per chat call. A run with N iterations produces N rounds of reasoning / content / tool events.
 
@@ -165,6 +166,22 @@ type AgentContentEnd = {
 
 An assistant message has been committed to history. Fires once per loop iteration — multiple times in a single chat call when the LLM uses tools across multiple turns. Includes tool-call-only turns that produced no text.
 
+
+### `agent_tool_call_delta`
+
+```ts
+type AgentToolCallDelta = {
+  type: 'agent_tool_call_delta';
+  index: number;
+  id?: string;
+  name?: string;
+  argumentsDelta: string;
+};
+```
+
+A chunk of a streaming tool call, paired with `agent_content_delta` but for tool calls.
+- The first chunk for an `index` carries `id` and `name`
+- Later chunks carry only `argumentsDelta` (a partial JSON string — concatenate all chunks for the full arguments).
 
 ### `agent_tool_call_start`
 
@@ -245,6 +262,7 @@ How each event emits, side by side:
 | `agent_reasoning_end` | once per iteration | once per iteration |
 | `agent_content_delta` | <Chip color="default" variant='soft' size="md">1 delta (whole content) per iteration</Chip> | <Chip color="default" variant='soft' size="md">N deltas (token-by-token) per iteration</Chip> |
 | `agent_content_end` | once per iteration | once per iteration |
+| `agent_tool_call_delta` | <Chip color="default" variant='soft' size="md">1 delta (whole call) per tool call</Chip> | <Chip color="default" variant='soft' size="md">N deltas (chunked) per tool call</Chip> |
 | `agent_tool_call_start` | per tool call | per tool call |
 | `agent_tool_call_result` | per tool call (on success)| per tool call (on success)|
 | `agent_tool_call_error` | per tool call (on error)| per tool call (on error)|
