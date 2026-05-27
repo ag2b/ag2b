@@ -1,6 +1,6 @@
 {
   "name": "@ag2b/react",
-  "version": "0.0.2",
+  "version": "0.1.0",
   "description": "AG2B bindings for React",
   "license": "MIT",
   "author": "Alexey Vasyukov (@notmedia)",
@@ -27,7 +27,7 @@
     "test:coverage": "vitest run --coverage"
   },
   "peerDependencies": {
-    "@ag2b/core": "*",
+    "@ag2b/core": "^0.1.0",
     "react": ">=18",
     "zod": "^3.25.0 || ^4.0.0"
   },

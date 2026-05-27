@@ -1,5 +1,11 @@
 # @ag2b/react-chat
 
+## 0.1.0
+
+### Minor Changes
+
+- Add clear chat history button (showClearChat prop on Ag2bPopup)
+
 ## 0.0.2
 
 ### Patch Changes

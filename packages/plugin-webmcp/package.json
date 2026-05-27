@@ -1,6 +1,6 @@
 {
   "name": "@ag2b/plugin-webmcp",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "description": "AG2B plugin that bridges tools to the browser WebMCP API.",
   "license": "MIT",
   "author": "Alexey Vasyukov (@notmedia)",
@@ -27,7 +27,7 @@
     "test:coverage": "vitest run --coverage"
   },
   "peerDependencies": {
-    "@ag2b/core": "*"
+    "@ag2b/core": "^0.1.0"
   },
   "devDependencies": {
     "@types/node": "25.9.1",

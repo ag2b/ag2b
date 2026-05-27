@@ -1,6 +1,6 @@
 {
   "name": "@ag2b/react-chat",
-  "version": "0.0.2",
+  "version": "0.1.0",
   "description": "Drop-in chat UI for @ag2b/react",
   "license": "MIT",
   "author": "Alexey Vasyukov (@notmedia)",
@@ -28,8 +28,8 @@
     "test:coverage": "vitest run --coverage"
   },
   "peerDependencies": {
-    "@ag2b/core": "*",
-    "@ag2b/react": "*",
+    "@ag2b/core": "^0.1.0",
+    "@ag2b/react": "^0.1.0",
     "react": ">=18",
     "react-dom": ">=18",
     "react-markdown": ">=9",

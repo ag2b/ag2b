@@ -7,13 +7,21 @@
     }
   ],
   "commit": false,
-  "fixed": [["@ag2b/core", "@ag2b/react"]],
+  "fixed": [
+    [
+      "@ag2b/core",
+      "@ag2b/react"
+    ]
+  ],
   "linked": [],
-  "access": "public",
-  "baseBranch": "main",
-  "updateInternalDependencies": "patch",
   "ignore": [
     "docs",
     "react-board"
-  ]
+  ],
+  "updateInternalDependencies": "patch",
+  "___experimentalUnsafeOptions_WILL_CHANGE_IN_PATCH": {
+    "onlyUpdatePeerDependentsWhenOutOfRange": true
+  },
+  "access": "public",
+  "baseBranch": "main"
 }
