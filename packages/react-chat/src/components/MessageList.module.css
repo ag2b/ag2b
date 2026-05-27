@@ -7,3 +7,30 @@
   flex: 1;
   background: var(--ag2b-bg);
 }
+
+/* Centered empty state shown before the first message. */
+.empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 24px;
+  text-align: center;
+}
+.emptyLogo {
+  color: var(--ag2b-fg);
+  opacity: 0.9;
+}
+.emptyTitle {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ag2b-fg);
+}
+.emptyHint {
+  font-size: 12px;
+  line-height: 1.5;
+  max-width: 220px;
+  color: var(--ag2b-fg-muted);
+}

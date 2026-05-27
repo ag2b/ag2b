@@ -21,8 +21,10 @@ type PanelProps = {
   placement: Ag2bPopupPlacement;
   mode: Ag2bPopupMode;
   showModeToggle: boolean;
+  showClearChat: boolean;
   showReasoning: boolean;
   onModeChange: (mode: Ag2bPopupMode) => void;
+  onClearChat: () => void;
   onClose: () => void;
   onSend: (message: string) => void;
   onAbort: () => void;
@@ -39,8 +41,10 @@ export const Panel = ({
   placement,
   mode,
   showModeToggle,
+  showClearChat,
   showReasoning,
   onModeChange,
+  onClearChat,
   onClose,
   onSend,
   onAbort,
@@ -63,7 +67,10 @@ export const Panel = ({
       mode={mode}
       onModeChange={onModeChange}
       onClose={onClose}
+      onClearChat={onClearChat}
       showModeToggle={showModeToggle}
+      showClearChat={showClearChat}
+      clearDisabled={isPending || messages.length === 0}
       className={classNames?.header}
     />
     <MessageList

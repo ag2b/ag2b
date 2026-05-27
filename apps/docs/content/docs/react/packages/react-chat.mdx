@@ -59,6 +59,7 @@ type Ag2bPopupProps = {
   placement?: 'bottom-right' | 'bottom-left' | 'top-right' | 'top-left';
   mode?: 'streaming' | 'synchronous';
   showModeToggle?: boolean;
+  showClearChat?: boolean;
   showReasoning?: boolean;
   placeholder?: string;
   classNames?: Ag2bPopupClassNames;
@@ -70,9 +71,12 @@ type Ag2bPopupProps = {
 | `placement`      | `'bottom-right'` | Which corner the FAB anchors to. One of `'bottom-right'`, `'bottom-left'`, `'top-right'`, `'top-left'`.  |
 | `mode`           | `'streaming'`    | One of `'synchronous`, `'streaming'`.                                                                    |
 | `showModeToggle` | `false`          | Renders a header control that flips between streaming and synchronous at runtime.                        |
+| `showClearChat`  | `false`          | Renders a header **Clear** button that resets the conversation history. Disabled while a turn is in flight or when there are no messages. |
 | `showReasoning`  | `false`          | Renders assistant `reasoning` (when the provider emits it) as a collapsible block above each message.    |
 | `placeholder`    | —                | Composer placeholder text.                                                                               |
 | `classNames`     | —                | Per-slot class overrides — see [Slots](#slots).                                                          |
+
+The popup closes only via the FAB or its header close button — not on outside-click or Escape — so app overlays the agent triggers (modals, popovers) don't collapse it. The composer autofocuses each time the panel opens.
 
 ### Slots
 

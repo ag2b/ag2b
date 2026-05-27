@@ -7,17 +7,74 @@
   background: var(--ag2b-bg-elevated);
   color: var(--ag2b-fg);
 }
-.title { font-weight: 600; flex: 1; }
-.button {
-  border: 1px solid var(--ag2b-border);
-  background: var(--ag2b-bg);
-  color: var(--ag2b-fg);
-  padding: 4px 8px;
-  border-radius: var(--ag2b-radius-sm);
-  cursor: pointer;
-  font-size: 12px;
+.title {
+  font-weight: 600;
 }
-.button:hover { background: var(--ag2b-bg-hover); }
+.spacer {
+  flex: 1;
+}
+
+/* Response mode: a labeled switch — on = streaming, off = synchronous. */
+.modeToggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: none;
+  background: none;
+  padding: 0;
+  cursor: pointer;
+  color: var(--ag2b-fg-muted);
+  font-size: 11px;
+  font-weight: 500;
+}
+.modeToggle:hover {
+  color: var(--ag2b-fg);
+}
+.switchTrack {
+  position: relative;
+  flex: none;
+  width: 26px;
+  height: 15px;
+  border-radius: 999px;
+  background: var(--ag2b-bg-hover);
+  transition: background 0.15s ease;
+}
+.switchTrackOn {
+  background: var(--ag2b-accent);
+}
+.switchKnob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 11px;
+  height: 11px;
+  border-radius: 999px;
+  background: #fff;
+  transition: transform 0.15s ease;
+}
+.switchKnobOn {
+  transform: translateX(11px);
+}
+
+/* Clear: plain icon button, muted by default and danger-red on hover. */
+.clearButton {
+  display: inline-flex;
+  align-items: center;
+  border: none;
+  background: none;
+  color: var(--ag2b-fg-muted);
+  cursor: pointer;
+  padding: 0 4px;
+  transition: color 0.15s ease;
+}
+.clearButton:hover:not(:disabled) {
+  color: var(--ag2b-danger);
+}
+.clearButton:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
 .closeButton {
   border: none;
   background: none;
@@ -26,4 +83,6 @@
   cursor: pointer;
   padding: 0 4px;
 }
-.closeButton:hover { color: var(--ag2b-fg); }
+.closeButton:hover {
+  color: var(--ag2b-fg);
+}

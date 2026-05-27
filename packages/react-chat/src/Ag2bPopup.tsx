@@ -1,5 +1,5 @@
-import { useAg2bHistory } from '@ag2b/react';
-import { useCallback, useEffect, useId, useRef, useState } from 'react';
+import { useAg2bAgent, useAg2bHistory } from '@ag2b/react';
+import { useCallback, useId, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 
 import { Fab } from '@/components/Fab';
@@ -11,6 +11,7 @@ export const Ag2bPopup = ({
   placement = 'bottom-right',
   mode: initialMode = 'streaming',
   showModeToggle = false,
+  showClearChat = false,
   showReasoning = false,
   placeholder,
   classNames,
@@ -20,8 +21,11 @@ export const Ag2bPopup = ({
   const panelId = useId();
   const fabRef = useRef<HTMLDivElement>(null);
 
+  const agent = useAg2bAgent();
   const history = useAg2bHistory();
   const controller = useChatController({ mode });
+
+  const clearChat = useCallback(() => agent.history.reset(), [agent]);
 
   const close = useCallback(() => {
     setOpen(false);
@@ -29,30 +33,6 @@ export const Ag2bPopup = ({
       fabRef.current?.querySelector('button')?.focus();
     });
   }, []);
-
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') close();
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [open, close]);
-
-  useEffect(() => {
-    if (!open) return;
-    const onDown = (e: MouseEvent) => {
-      const panel = document.getElementById(panelId);
-      const fab = fabRef.current;
-      const target = e.target as Node | null;
-      if (!target) return;
-      if (panel?.contains(target)) return;
-      if (fab?.contains(target)) return;
-      close();
-    };
-    window.addEventListener('mousedown', onDown);
-    return () => window.removeEventListener('mousedown', onDown);
-  }, [open, panelId, close]);
 
   return (
     <>
@@ -72,8 +52,10 @@ export const Ag2bPopup = ({
               placement={placement}
               mode={mode}
               showModeToggle={showModeToggle}
+              showClearChat={showClearChat}
               showReasoning={showReasoning}
               onModeChange={setMode}
+              onClearChat={clearChat}
               onClose={close}
               onSend={(msg) => {
                 void controller.send(msg);

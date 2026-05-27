@@ -22,6 +22,7 @@ export type Ag2bPopupProps = {
   placement?: Ag2bPopupPlacement;
   mode?: Ag2bPopupMode;
   showModeToggle?: boolean;
+  showClearChat?: boolean;
   showReasoning?: boolean;
   placeholder?: string;
   classNames?: Ag2bPopupClassNames;

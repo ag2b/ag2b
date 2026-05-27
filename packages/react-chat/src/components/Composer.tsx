@@ -26,6 +26,11 @@ export const Composer = ({
   const [value, setValue] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
+  // Focus the input when the composer mounts — i.e. each time the panel opens.
+  useEffect(() => {
+    textareaRef.current?.focus();
+  }, []);
+
   useEffect(() => {
     const el = textareaRef.current;
     if (!el) return;
