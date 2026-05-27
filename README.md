@@ -1,25 +1,36 @@
 # AG2B
 
+> [!IMPORTANT]
+> Full documentation lives at [**ag2b.ai**](https://ag2b.ai).
+
 **AG2B** (Agent to Browser) is a client-side agentic runtime.
 
 The agent runs where your app does — in the browser. The server's role can range from a thin LLM proxy to a layer that extends the client runtime.
 
-> [!WARNING]
-> AG2B is under active development — the public API can shift between minor releases. Check release notes before upgrading.
-
-> [!IMPORTANT]
-> Full documentation lives at [**ag2b.ai**](https://ag2b.ai).
+> [!TIP]
+> Try the [**live demo**](https://ag2b-example.vercel.app)
 
 ## What you get
 
-🧩 **Agent primitives** — Building blocks that live next to your components and stores.\
-🛡️ **End-to-end typed tools** — Zod schemas validate at runtime and type your handler.\
-🔄 **Open lifecycle** — Observe or intercept every boundary in the loop.\
-🔌 **Provider-agnostic** — Swap LLM providers with one line — built-in or your own.\
-📦 **Plain TypeScript core** — No framework lock-in. Drop it into anything.\
-🧱 **Framework bindings** — Per-framework bindings.
+Anything the user can do in your UI, the LLM can do too.
+
+- **Agent primitives** — Tools and scopes, the building blocks of every agent.
+- **Reuse your code** — Store actions, fetch wrappers, click handlers become tools.
+- **Live context** — Scopes feed your current state into every turn and gates the tools.
+- **End-to-end typed** — Zod validates at runtime and types your handler.
+- **Own the loop** — Observe or intercept every step: **human-in-the-loop** approvals, guardrails, retries, RAG, logging — all on the client.
+- **Provider-agnostic** — Swap LLM providers in one line, built-in or bring your own.
+- **Extend everything** — Plugins reshape the runtime — the [WebMCP](https://ag2b.ai/docs/plugins/webmcp) plugin is one such connector.
+
+**Framework bindings**
+
+- **React** — Headless hooks [`@ag2b/react`](https://ag2b.ai/docs/react) to build your own chat UI, or a drop-in chat panel [`@ag2b/react-chat`](https://ag2b.ai/docs/react/packages/react-chat).
+- **Vue** — Coming soon.
 
 ## Quickstart
+
+> [!WARNING]
+> AG2B is under active development — the public API can shift between minor releases. Check release notes before upgrading.
 
 ### Install
 
