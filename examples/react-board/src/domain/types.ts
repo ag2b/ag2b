@@ -1,16 +1,21 @@
 export type Priority = 'low' | 'medium' | 'high';
 
-export type ColumnId = 'backlog' | 'inProgress' | 'review' | 'done';
+export type ColumnId = 'backlog' | 'inProgress' | 'done';
 
-export type TagColor =
-  | 'rose'
-  | 'amber'
-  | 'emerald'
-  | 'sky'
-  | 'violet'
-  | 'fuchsia'
-  | 'neutral'
-  | 'orange';
+// The selectable palette. Order here is the order shown in color pickers.
+// `as const` so it doubles as the source of the TagColor union and a Zod enum.
+export const TAG_COLORS = [
+  'rose',
+  'amber',
+  'emerald',
+  'sky',
+  'violet',
+  'fuchsia',
+  'neutral',
+  'orange',
+] as const;
+
+export type TagColor = (typeof TAG_COLORS)[number];
 
 export type Subtask = {
   id: string;

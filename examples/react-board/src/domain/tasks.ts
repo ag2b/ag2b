@@ -1,14 +1,25 @@
 import { create } from 'zustand';
 
-import type { ColumnId, Priority, Subtask, Tag, TagColor, Task } from './types';
+import { seedTasks } from './seed';
+import type { ColumnId, Priority, Subtask, Task } from './types';
 
-type BoardState = {
+type TasksState = {
   tasks: Task[];
-  tags: Tag[];
 
   // tasks
-  addTask: (input: { name: string; priority: Priority }) => string;
-  updateTask: (id: string, patch: Partial<Pick<Task, 'name' | 'priority' | 'description'>>) => void;
+  addTask: (input: {
+    name: string;
+    priority: Priority;
+    description?: string;
+    status?: ColumnId;
+    assigneeId?: string | null;
+    tagIds?: string[];
+    subtasks?: string[];
+  }) => string;
+  updateTask: (
+    id: string,
+    patch: Partial<Pick<Task, 'name' | 'priority' | 'description' | 'assigneeId' | 'tagIds'>>
+  ) => void;
   removeTask: (id: string) => void;
   moveTask: (id: string, toStatus: ColumnId, toIndex: number) => void;
 
@@ -20,22 +31,18 @@ type BoardState = {
   renameSubtask: (taskId: string, subtaskId: string, text: string) => void;
   toggleSubtask: (taskId: string, subtaskId: string) => void;
   removeSubtask: (taskId: string, subtaskId: string) => void;
+  completeAllSubtasks: (taskId: string) => void;
 
-  // tags — collection
-  createTag: (input: { name: string; color: TagColor }) => string;
-  renameTag: (id: string, name: string) => void;
-  recolorTag: (id: string, color: TagColor) => void;
-  deleteTag: (id: string) => void;
-
-  // tags — relation
+  // tags — relation (the tag collection itself lives in the settings store)
   toggleTagOnTask: (taskId: string, tagId: string) => void;
+  // Strip a deleted tag from every task. Called by the settings store on tag deletion.
+  purgeTag: (tagId: string) => void;
 };
 
 function renumber(tasks: Task[]): Task[] {
   const counters: Record<ColumnId, number> = {
     backlog: 0,
     inProgress: 0,
-    review: 0,
     done: 0,
   };
   return tasks.map((t) => ({ ...t, order: counters[t.status]++ }));
@@ -45,41 +52,60 @@ function patchTask(tasks: Task[], id: string, mutate: (task: Task) => Task): Tas
   return tasks.map((t) => (t.id === id ? mutate(t) : t));
 }
 
-export const useBoardStore = create<BoardState>((set) => ({
-  tasks: [],
-  tags: [],
+function requireTask(tasks: Task[], id: string): void {
+  if (!tasks.some((t) => t.id === id)) {
+    throw new Error(`No task with id "${id}"`);
+  }
+}
 
-  addTask: ({ name, priority }) => {
+// Keep only the keys whose value is defined, so a patch with `undefined` fields
+// doesn't clobber existing task values when spread.
+function definedOnly<T extends object>(patch: T): Partial<T> {
+  return Object.fromEntries(Object.entries(patch).filter(([, v]) => v !== undefined)) as Partial<T>;
+}
+
+export const useTasksStore = create<TasksState>((set, get) => ({
+  tasks: seedTasks(),
+
+  addTask: (input) => {
     const id = crypto.randomUUID();
     set((s) => {
-      const orderInBacklog = s.tasks.filter((t) => t.status === 'backlog').length;
+      const status = input.status ?? 'backlog';
+      const order = s.tasks.filter((t) => t.status === status).length;
       const next: Task = {
         id,
-        name,
-        priority,
-        status: 'backlog',
-        order: orderInBacklog,
-        description: '',
-        subtasks: [],
-        tagIds: [],
-        assigneeId: null,
+        name: input.name,
+        priority: input.priority,
+        status,
+        order,
+        description: input.description ?? '',
+        subtasks: (input.subtasks ?? []).map((text) => ({
+          id: crypto.randomUUID(),
+          text,
+          done: false,
+        })),
+        tagIds: input.tagIds ?? [],
+        assigneeId: input.assigneeId ?? null,
       };
       return { tasks: [...s.tasks, next] };
     });
     return id;
   },
 
-  updateTask: (id, patch) =>
+  updateTask: (id, patch) => {
+    requireTask(get().tasks, id);
     set((s) => ({
-      tasks: patchTask(s.tasks, id, (t) => ({ ...t, ...patch })),
-    })),
+      tasks: patchTask(s.tasks, id, (t) => ({ ...t, ...definedOnly(patch) })),
+    }));
+  },
 
   removeTask: (id) =>
     set((s) => ({
       tasks: renumber(s.tasks.filter((t) => t.id !== id)),
     })),
 
-  moveTask: (id, toStatus, toIndex) =>
+  moveTask: (id, toStatus, toIndex) => {
+    requireTask(get().tasks, id);
     set((s) => {
       const moving = s.tasks.find((t) => t.id === id);
       if (!moving) return s;
@@ -94,7 +120,8 @@ export const useBoardStore = create<BoardState>((set) => ({
       inTarget.splice(clampedIndex, 0, { ...moving, status: toStatus });
 
       return { tasks: renumber([...outside, ...inTarget]) };
-    }),
+    });
+  },
 
   assignTask: (taskId, personId) =>
     set((s) => ({
@@ -146,34 +173,11 @@ export const useBoardStore = create<BoardState>((set) => ({
       })),
     })),
 
-  createTag: ({ name, color }) => {
-    const id = crypto.randomUUID();
+  completeAllSubtasks: (taskId) =>
     set((s) => ({
-      tags: [...s.tags, { id, name: name.trim(), color }],
-    }));
-    return id;
-  },
-
-  renameTag: (id, name) =>
-    set((s) => {
-      const trimmed = name.trim();
-      if (!trimmed) return s;
-      return {
-        tags: s.tags.map((tag) => (tag.id === id ? { ...tag, name: trimmed } : tag)),
-      };
-    }),
-
-  recolorTag: (id, color) =>
-    set((s) => ({
-      tags: s.tags.map((tag) => (tag.id === id ? { ...tag, color } : tag)),
-    })),
-
-  deleteTag: (id) =>
-    set((s) => ({
-      tags: s.tags.filter((tag) => tag.id !== id),
-      tasks: s.tasks.map((t) => ({
+      tasks: patchTask(s.tasks, taskId, (t) => ({
         ...t,
-        tagIds: t.tagIds.filter((tagId) => tagId !== id),
+        subtasks: t.subtasks.map((sub) => ({ ...sub, done: true })),
       })),
     })),
 
@@ -184,6 +188,14 @@ export const useBoardStore = create<BoardState>((set) => ({
         tagIds: t.tagIds.includes(tagId)
           ? t.tagIds.filter((id) => id !== tagId)
           : [...t.tagIds, tagId],
+      })),
+    })),
+
+  purgeTag: (tagId) =>
+    set((s) => ({
+      tasks: s.tasks.map((t) => ({
+        ...t,
+        tagIds: t.tagIds.filter((id) => id !== tagId),
       })),
     })),
 }));

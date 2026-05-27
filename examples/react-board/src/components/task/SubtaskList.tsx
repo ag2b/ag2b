@@ -1,8 +1,8 @@
 import { Trash2 } from 'lucide-react';
 import { useState } from 'react';
 
-import { useBoardStore } from '../domain/store';
-import type { Subtask } from '../domain/types';
+import { useTasksStore } from '../../domain/tasks';
+import type { Subtask } from '../../domain/types';
 
 type SubtaskListProps = {
   taskId: string;
@@ -10,10 +10,10 @@ type SubtaskListProps = {
 };
 
 export function SubtaskList({ taskId, subtasks }: SubtaskListProps) {
-  const addSubtask = useBoardStore((s) => s.addSubtask);
-  const toggleSubtask = useBoardStore((s) => s.toggleSubtask);
-  const renameSubtask = useBoardStore((s) => s.renameSubtask);
-  const removeSubtask = useBoardStore((s) => s.removeSubtask);
+  const addSubtask = useTasksStore((s) => s.addSubtask);
+  const toggleSubtask = useTasksStore((s) => s.toggleSubtask);
+  const renameSubtask = useTasksStore((s) => s.renameSubtask);
+  const removeSubtask = useTasksStore((s) => s.removeSubtask);
 
   const [newText, setNewText] = useState('');
   const done = subtasks.filter((s) => s.done).length;

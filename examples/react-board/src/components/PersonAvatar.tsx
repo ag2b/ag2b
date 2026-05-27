@@ -1,5 +1,5 @@
-import { TAG_BG } from '../domain/tag-colors';
 import type { Person } from '../domain/types';
+import { TAG_BG } from './tag/tag-styles';
 
 type Size = 'sm' | 'md';
 

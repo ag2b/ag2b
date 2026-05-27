@@ -16,25 +16,26 @@ import {
   SelectPopover,
   SelectTrigger,
   SelectValue,
+  TextArea,
   useOverlayState,
 } from '@heroui/react';
 import type { Key } from 'react';
 import { useState } from 'react';
 
-import { findPerson, PEOPLE } from '../domain/people';
-import { useBoardStore } from '../domain/store';
-import type { Priority, Subtask, Task } from '../domain/types';
-import { PersonAvatar } from './PersonAvatar';
-import { PRIORITY_META } from './priority';
+import { findPerson, PEOPLE } from '../../domain/people';
+import { useTasksStore } from '../../domain/tasks';
+import type { Priority, Subtask, Task } from '../../domain/types';
+import { PersonAvatar } from '../PersonAvatar';
+import { TagSelect } from '../tag/TagSelect';
+import { PRIORITY_META } from './priority-meta';
 import { SubtaskList, SubtaskRow } from './SubtaskList';
-import { TagPicker } from './TagPicker';
 
 type TaskModalProps = {
   state: ReturnType<typeof useOverlayState>;
   task?: Task;
 };
 
-const PRIORITIES: readonly Priority[] = ['low', 'medium', 'high'];
+const PRIORITIES: readonly Priority[] = ['high', 'medium', 'low'];
 const UNASSIGNED_KEY = '__unassigned__';
 
 function isPriority(value: unknown): value is Priority {
@@ -47,15 +48,15 @@ type TaskFormProps = {
 };
 
 function TaskForm({ task, onClose }: TaskFormProps) {
-  const addTask = useBoardStore((s) => s.addTask);
-  const updateTask = useBoardStore((s) => s.updateTask);
-  const assignTask = useBoardStore((s) => s.assignTask);
-  const toggleTagOnTask = useBoardStore((s) => s.toggleTagOnTask);
-  const addSubtask = useBoardStore((s) => s.addSubtask);
+  const addTask = useTasksStore((s) => s.addTask);
+  const updateTask = useTasksStore((s) => s.updateTask);
+  const assignTask = useTasksStore((s) => s.assignTask);
+  const toggleTagOnTask = useTasksStore((s) => s.toggleTagOnTask);
+  const addSubtask = useTasksStore((s) => s.addSubtask);
 
   // Live store snapshot of the task being edited (so subtask/tag/assignee
   // mutations re-render the modal immediately).
-  const liveTask = useBoardStore((s) => (task ? s.tasks.find((t) => t.id === task.id) : undefined));
+  const liveTask = useTasksStore((s) => (task ? s.tasks.find((t) => t.id === task.id) : undefined));
   const editing = liveTask ?? task;
   const isEdit = task !== undefined;
 
@@ -122,6 +123,15 @@ function TaskForm({ task, onClose }: TaskFormProps) {
     }
   }
 
+  // The multi-select reports the full set of selected ids; translate that into
+  // per-tag toggles so create-mode (draft state) and edit-mode (store) share one path.
+  function onTagsChange(nextTagIds: string[]) {
+    const before = new Set(currentTagIds);
+    const after = new Set(nextTagIds);
+    for (const id of before) if (!after.has(id)) onToggleTag(id);
+    for (const id of after) if (!before.has(id)) onToggleTag(id);
+  }
+
   function onAddDraftSubtask() {
     const trimmed = draftSubtaskText.trim();
     if (!trimmed) return;
@@ -147,18 +157,19 @@ function TaskForm({ task, onClose }: TaskFormProps) {
 
   return (
     <Form onSubmit={onSubmit} className="flex flex-col">
-      <ModalHeader className="px-5 pt-5 pb-1">
+      <ModalHeader>
         <ModalHeading className="text-base font-semibold">
           {isEdit ? 'Edit task' : 'New task'}
         </ModalHeading>
       </ModalHeader>
-      <ModalBody className="flex flex-col gap-4 px-5 py-3">
+      <ModalBody className="flex flex-col gap-4 p-1">
         <label className="flex flex-col gap-1">
           <span className="text-xs font-medium uppercase tracking-wider text-neutral-400">
             Name
           </span>
           <Input
             placeholder="What needs to be done?"
+            variant="secondary"
             value={name}
             onChange={(e) => setName(e.target.value)}
             required
@@ -178,8 +189,9 @@ function TaskForm({ task, onClose }: TaskFormProps) {
             </span>
             <Select
               aria-label="Priority"
-              selectedKey={priority}
-              onSelectionChange={onPriorityChange}
+              variant="secondary"
+              value={priority}
+              onChange={onPriorityChange}
             >
               <SelectTrigger>
                 <SelectValue>
@@ -217,6 +229,7 @@ function TaskForm({ task, onClose }: TaskFormProps) {
             </span>
             <Select
               aria-label="Assignee"
+              variant="secondary"
               selectedKey={currentAssigneeId ?? UNASSIGNED_KEY}
               onSelectionChange={onAssigneeChange}
             >
@@ -256,18 +269,19 @@ function TaskForm({ task, onClose }: TaskFormProps) {
           <span className="text-xs font-medium uppercase tracking-wider text-neutral-400">
             Tags
           </span>
-          <TagPicker selectedTagIds={currentTagIds} onToggle={onToggleTag} />
+          <TagSelect selectedTagIds={currentTagIds} onChange={onTagsChange} />
         </div>
         <label className="flex flex-col gap-1">
           <span className="text-xs font-medium uppercase tracking-wider text-neutral-400">
             Description
           </span>
-          <textarea
+          <TextArea
+            variant="secondary"
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             placeholder="Add details, links, anything..."
             rows={3}
-            className="rounded-md border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-neutral-100 placeholder:text-neutral-600 focus:border-neutral-500 focus:outline-none"
+            fullWidth
           />
         </label>
         {isEdit && task && currentSubtasks ? (
@@ -314,7 +328,7 @@ function TaskForm({ task, onClose }: TaskFormProps) {
           </div>
         )}
       </ModalBody>
-      <ModalFooter className="flex justify-end gap-2 px-5 pt-1 pb-5">
+      <ModalFooter className="flex justify-end gap-2">
         <Button variant="ghost" onPress={() => onClose()}>
           Cancel
         </Button>
@@ -329,7 +343,7 @@ function TaskForm({ task, onClose }: TaskFormProps) {
 export function TaskModal({ state, task }: TaskModalProps) {
   return (
     <Modal state={state}>
-      <ModalBackdrop>
+      <ModalBackdrop className="app-modal-backdrop">
         <ModalContainer placement="center" size="lg">
           <ModalDialog>
             {state.isOpen ? (

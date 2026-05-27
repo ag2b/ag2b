@@ -1,18 +1,8 @@
-import type { TagColor } from './types';
+import type { TagColor } from '../../domain/types';
 
-export const TAG_COLORS: readonly TagColor[] = [
-  'rose',
-  'amber',
-  'emerald',
-  'sky',
-  'violet',
-  'fuchsia',
-  'neutral',
-  'orange',
-];
-
-// Tailwind class fragments for each color. Keep them as plain strings (NOT
+// Tailwind class fragments for each tag color. Kept as plain strings (NOT
 // template-built) so the Tailwind v4 scanner can discover every class.
+// Presentation only — the set of colors itself lives in domain (TAG_COLORS).
 export const TAG_BG: Record<TagColor, string> = {
   rose: 'bg-rose-500',
   amber: 'bg-amber-500',

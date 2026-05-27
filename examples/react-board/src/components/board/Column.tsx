@@ -1,8 +1,8 @@
 import { useDndContext, useDroppable } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 
-import type { ColumnId, Task } from '../domain/types';
-import { TaskCard } from './TaskCard';
+import type { ColumnId, Task } from '../../domain/types';
+import { TaskCard } from '../task/TaskCard';
 
 type ColumnProps = {
   id: ColumnId;
@@ -14,7 +14,6 @@ type ColumnProps = {
 const ACCENT: Record<ColumnId, string> = {
   backlog: 'bg-neutral-500',
   inProgress: 'bg-sky-500',
-  review: 'bg-amber-500',
   done: 'bg-emerald-500',
 };
 
@@ -32,7 +31,7 @@ export function Column({ id, label, tasks, onEditTask }: ColumnProps) {
     <section
       ref={setNodeRef}
       className={[
-        'flex w-80 shrink-0 flex-col rounded-xl border bg-neutral-900/60 transition-colors',
+        'flex min-h-0 w-80 shrink-0 flex-col rounded-xl border bg-neutral-900/60 transition-colors',
         isActiveColumn ? 'border-neutral-500 bg-neutral-900' : 'border-neutral-800',
       ].join(' ')}
     >
@@ -45,7 +44,7 @@ export function Column({ id, label, tasks, onEditTask }: ColumnProps) {
           <span className="text-xs text-neutral-500">{tasks.length}</span>
         </div>
       </header>
-      <div className="flex flex-1 flex-col gap-2 px-3 pt-1 pb-3">
+      <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto px-3 pt-1 pb-3">
         <SortableContext items={tasks.map((t) => t.id)} strategy={verticalListSortingStrategy}>
           {tasks.length === 0 ? (
             <div className="flex flex-1 items-center justify-center rounded-lg border border-dashed border-neutral-800 px-3 py-6 text-xs text-neutral-600">

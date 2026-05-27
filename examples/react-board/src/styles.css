@@ -7,3 +7,10 @@ body,
   height: 100%;
   margin: 0;
 }
+
+/* The chat widget floats at a near-max z so it sits above page content. App modals
+ * are triggered by the agent, so they must sit above the chat — layer them one above
+ * the chat panel rather than hardcoding a magic number. */
+.app-modal-backdrop {
+  z-index: calc(var(--ag2b-z-panel, 2147483001) + 1);
+}

@@ -1,7 +1,7 @@
 import { X } from 'lucide-react';
 
-import { TAG_BG } from '../domain/tag-colors';
-import type { Tag } from '../domain/types';
+import type { Tag } from '../../domain/types';
+import { TAG_BG } from './tag-styles';
 
 type TagChipProps = {
   tag: Tag;

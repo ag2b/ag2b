@@ -2,12 +2,13 @@ import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { CheckSquare, Pencil, Trash2 } from 'lucide-react';
 
-import { findPerson } from '../domain/people';
-import { useBoardStore } from '../domain/store';
-import type { Task } from '../domain/types';
-import { PersonAvatar } from './PersonAvatar';
-import { PRIORITY_META } from './priority';
-import { TagChip } from './TagChip';
+import { findPerson } from '../../domain/people';
+import { useSettingsStore } from '../../domain/settings';
+import { useTasksStore } from '../../domain/tasks';
+import type { Task } from '../../domain/types';
+import { PersonAvatar } from '../PersonAvatar';
+import { TagChip } from '../tag/TagChip';
+import { PRIORITY_META } from './priority-meta';
 
 type TaskCardProps = {
   task: Task;
@@ -18,8 +19,8 @@ type TaskCardProps = {
 const MAX_VISIBLE_TAGS = 2;
 
 export function TaskCard({ task, onEdit, isOverlay = false }: TaskCardProps) {
-  const removeTask = useBoardStore((s) => s.removeTask);
-  const tags = useBoardStore((s) => s.tags);
+  const removeTask = useTasksStore((s) => s.removeTask);
+  const tags = useSettingsStore((s) => s.tags);
 
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: task.id,
@@ -76,7 +77,7 @@ export function TaskCard({ task, onEdit, isOverlay = false }: TaskCardProps) {
                 e.stopPropagation();
                 onEdit(task);
               }}
-              className="rounded p-1 text-neutral-400 hover:bg-neutral-700 hover:text-neutral-100"
+              className="cursor-pointer rounded p-1 text-neutral-400 hover:bg-neutral-700 hover:text-neutral-100"
             >
               <Pencil size={14} />
             </button>
@@ -88,7 +89,7 @@ export function TaskCard({ task, onEdit, isOverlay = false }: TaskCardProps) {
                 e.stopPropagation();
                 removeTask(task.id);
               }}
-              className="rounded p-1 text-neutral-400 hover:bg-neutral-700 hover:text-rose-400"
+              className="cursor-pointer rounded p-1 text-neutral-400 hover:bg-neutral-700 hover:text-rose-400"
             >
               <Trash2 size={14} />
             </button>
