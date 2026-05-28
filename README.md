@@ -29,9 +29,6 @@ Anything the user can do in your UI, the LLM can do too.
 
 ## Quickstart
 
-> [!WARNING]
-> AG2B is under active development — the public API can shift between minor releases. Check release notes before upgrading.
-
 ### Install
 
 ```bash

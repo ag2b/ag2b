@@ -1,5 +1,5 @@
 import { buttonVariants, Link } from '@heroui/react';
-import { Star } from 'lucide-react';
+import { BookOpen, Star } from 'lucide-react';
 
 import { ProviderSummary } from '../provider/ProviderSummary';
 
@@ -29,20 +29,32 @@ export function BoardHeader({ onEditProvider }: BoardHeaderProps) {
         <h1 className="text-2xl font-semibold tracking-tight">AG2B Example</h1>
         <ProviderSummary onEdit={onEditProvider} />
       </div>
-      <Link
-        href="https://github.com/ag2b/ag2b"
-        target="_blank"
-        rel="noreferrer"
-        aria-label="Star ag2b on GitHub"
-        className={`group ${buttonVariants({ variant: 'outline', size: 'md' })}`}
-      >
-        <GithubMark size={16} className="mr-2 -ml-0.5" />
-        Star on GitHub
-        <Star
-          size={14}
-          className="ml-2 text-neutral-500 transition-colors group-hover:fill-amber-400 group-hover:text-amber-400"
-        />
-      </Link>
+      <div className="flex items-center gap-2">
+        <Link
+          href="https://ag2b.ai"
+          target="_blank"
+          rel="noreferrer"
+          aria-label="Read the AG2B docs"
+          className={buttonVariants({ variant: 'outline', size: 'md' })}
+        >
+          <BookOpen size={16} className="mr-2 -ml-0.5" />
+          Docs
+        </Link>
+        <Link
+          href="https://github.com/ag2b/ag2b"
+          target="_blank"
+          rel="noreferrer"
+          aria-label="Star ag2b on GitHub"
+          className={`group ${buttonVariants({ variant: 'outline', size: 'md' })}`}
+        >
+          <GithubMark size={16} className="mr-2 -ml-0.5" />
+          Star on GitHub
+          <Star
+            size={14}
+            className="ml-2 text-neutral-500 transition-colors group-hover:fill-amber-400 group-hover:text-amber-400"
+          />
+        </Link>
+      </div>
     </header>
   );
 }
